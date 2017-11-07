@@ -116,7 +116,6 @@ ylabel('Delta Px (a.u)','Fontsize',32);
 
 clear a g h icons plots str legend_cell legend_cols legend_lines n r x y_lims 
 
-
 %% Figure - Parameter Distributions V3 (I) 
     % Uses a log axis for plots 
     % Plot's Std Rather than SEM 
@@ -167,18 +166,21 @@ for p = 1:size(parameters,2) - 2 % For each parameter
 %                 end
 %                     Find the number of fish
                 
-            plot((1:crop)/unit_conversion(1,p),...
-                data{1,t}(data{2,t} == g & data{3,t} == e,1:crop),...
-                'color',cmap_2(col,:)+(1-cmap_2(col,:))*(1-(1/(e+4)^.5)),'linewidth',1.5)
-                        
-            legend_lines(col) = plot((1:crop)/unit_conversion(1,p),...
-                nanmean(data{1,t}(data{2,t} == g & data{3,t} == e,1:crop)),...
-                'color',cmap_2(col,:)+(1-cmap_2(col,:))*(1-(1/e^.5)),'linewidth',3); 
+            plot(,...
+                'color',cmap(g,:)+(1-cmap(g,:))*(1-(1/(e+4)^.5)))
             
+            legend_lines(g) = plot((nanmean(squeeze(parameter_comparisons{p}...
+                (experiment_tags(group_tags == g) == e,g,time_window(1):time_window(2))),1)/unit_conversion(1,p)),...
+                'color',cmap(g,:)+(1-cmap(g,:))*(1-(1/e^.5)),'linewidth',3);
+            
+                legend_lines(col) = shadedErrorBar((1:crop)/unit_conversion(1,p),...
+                    nanmean(data{1,t}(data{2,t} == g & data{3,t} == e,1:crop)),...
+                    nanstd(data{1,t}(data{2,t} == g & data{3,t} == e,1:crop))...%/sqrt(sample)
+                    ,'lineprops',{'color',cmap_2(col,:)+(1-cmap_2(col,:))*(1-(1/e^.5))}); 
                 % Plot - note that this is now in appropriate units
                     % (eg.seconds) 
                 
-                legend_cols(col,:) = legend_lines(col).Color; % Save color
+                legend_cols(col) = legend_lines(col).mainLine; % Save color
 
                 % Append time window to group names 
                 if e == 1 % For the first experiment 
@@ -197,8 +199,8 @@ for p = 1:size(parameters,2) - 2 % For each parameter
                     end
                 end
                 % Determine Axis boundaries 
-                y_lims(1,counter) = max(legend_lines(col).YData);
-                y_lims(2,counter) = min(legend_lines(col).YData);
+                y_lims(1,counter) = max(legend_lines(col).mainLine.YData);
+                y_lims(2,counter) = min(legend_lines(col).mainLine.YData);
                 
                 col = col + 1; % Add to color 
                 counter = counter + 1; % Add to counter 
@@ -235,12 +237,12 @@ for p = 1:size(parameters,2) - 2 % For each parameter
         ylabel(units(p),'Fontsize',12); % Y labels 
         set(gca,'xticklabel',geno_list.colheaders,'Fontsize',12); % Name each group  
     end
-%     if p == 5 % For the 5th parameter - add a legend 
-%         [~,icons,~,~] = legend(legend_cols,legend_cell,'Location','northeast');
-%         legend('boxoff'); 
-%         set(icons(1:max(group_tags)*2),'Fontsize',13); 
-%         set(icons((max(group_tags)*2)+1:2:end),'LineWidth',3)
-%     end
+    if p == 5 % For the 5th parameter - add a legend 
+        [~,icons,~,~] = legend(legend_cols,legend_cell,'Location','northeast');
+        legend('boxoff'); 
+        set(icons(1:max(group_tags)*2),'Fontsize',13); 
+        set(icons((max(group_tags)*2)+1:2:end),'LineWidth',3)
+    end
         
 end
 

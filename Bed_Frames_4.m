@@ -761,9 +761,9 @@ cmap_2(1,:) = cmap;
 cmap_2(2,:) = [25 25 112]/255; % midnight blue 
 
 % Selecting a time window 
-% days = [2 3]; nights = [2 3]; 
-% time_window(1) = min([days_crop(days) nights_crop(nights)]);  
-% time_window(2) = max([days_crop(days) nights_crop(nights)]); 
+days = [2 3]; nights = [2 3]; 
+time_window(1) = min([days_crop(days) nights_crop(nights)]);  
+time_window(2) = max([days_crop(days) nights_crop(nights)]); 
 
 % Clean up
 clear f p e g t start  
@@ -1182,13 +1182,13 @@ if size(days_crop(days),2) == size(nights_crop(nights),2) % If there are an equa
 end 
 
 % Pre-allocation (Need to test to find x)  
-for p = 1:size(parameters,2) % For each parameter 
+for p = 1:size(parameters,2) - 2 % For each parameter 
     twa.p(1:15,p) = NaN; % Comparisons x parameters  
     twa.stats{p} = []; % Stats structure 
 end 
 
 % Calculations - account for experiment tags
-for p = 1:size(parameters,2) % For each parameter
+for p = 1:size(parameters,2)-2 % For each parameter
     clear scrap;
     scrap = parameter_comparisons{p}(:,:,time_window(1):time_window(2));
     scrap = scrap(:)'; % Vectorise  
@@ -1228,7 +1228,7 @@ clear anova_development anova_group anova_time anova_experiment p scrap t
 
 %% Stats - KW 
 
-for p = 1:size(parameters,2) % For each parameter
+for p = 1:size(parameters,2)-2 % For each parameter
     clear data; c = 1; d = 1; % Start counters 
     if ismember(p,[7:9 11:12]) == 0 % For most parameters 
         data{1,1} = reshape(permute(parameter_dists{p}(:,:,days_crop(days)),[1 3 2]),...

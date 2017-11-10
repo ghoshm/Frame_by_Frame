@@ -39,13 +39,13 @@ disp(horzcat('Running File ',folder_path)); % Report file choice
 
 % Pre-allocation
 time = nan(size(folder_open,1)*lines_per_sheet,1,'single'); % time {1}
-pause(30); % Wait for memory 
+%pause(30); % Wait for memory 
 data_type = nan(size(folder_open,1)*lines_per_sheet,1,'single'); % Data type {2} 
-pause(30); % Wait for memory 
+%pause(30); % Wait for memory 
 fish_id = nan(size(folder_open,1)*lines_per_sheet,1,'single'); % Fish id {3}
-pause(30); % Wait for memory 
+%pause(30); % Wait for memory 
 delta_px = nan(size(folder_open,1)*lines_per_sheet,1,'single'); % Delta px {4}
-pause(30); % Wait for memory 
+%pause(30); % Wait for memory 
 sheet_names = cell(size(folder_open,1),1); % Excel sheet names  
 
 % Ordering by File Name 
@@ -100,30 +100,39 @@ for f = O' % For each Excel file
         isnan(fish_id_order_check) == 0,1,'first'); % Find the first frame drops 
     
     while isempty(found) == 0 % While there are dropped frames 
-        
+
         % Use a sliding window to find where the pattern normalises
         % Cut backwards
         found_clip_b = [191 1];
-        while sum(fish_id_order_check(found - found_clip_b(1):found - found_clip_b(2))) ~= 191
-            found_clip_b = found_clip_b + 1; % Slide window
-            
-            % Catch Running past the start of the file exception
-            if found - found_clip_b(1) <= 1
-                found_clip_b = [found_clip_b(1) + 2 found_clip_b(1) + 2];
-                break
-            end 
+        if found - found_clip_b(1) < 1
+            found_clip_b = [found + 1 found + 1]; 
+        else
+            while sum(fish_id_order_check(found - found_clip_b(1):found - found_clip_b(2))) ~= 191
+                found_clip_b = found_clip_b + 1; % Slide window
+                
+                % Catch Running past the start of the file exception
+                if found - found_clip_b(1) < 1
+                    found_clip_b = [found_clip_b(1) + 1 found_clip_b(1) + 1];
+                    break
+                end
+            end
         end
         
         % Cut forwards
         found_clip_f = [1 191];
-        while sum(fish_id_order_check(found + found_clip_f(1):found + found_clip_f(2))) ~= 191
-            found_clip_f = found_clip_f + 1; % Slide window 
-            
-            % Catch Running past the end of the file exception 
-             if found + found_clip_f(2) >= size(fish_id_order_check,1)
-                 found_clip_f = [found_clip_f(2)+2 found_clip_f(2)+2]; 
-                 break 
-             end 
+        if found + found_clip_f(2) > length(fish_id_order_check)
+            found_clip_f = [length(fish_id_order_check) - found + 2 ... 
+                length(fish_id_order_check) - found + 2]; 
+        else
+            while sum(fish_id_order_check(found + found_clip_f(1):found + found_clip_f(2))) ~= 191
+                found_clip_f = found_clip_f + 1; % Slide window
+                
+                % Catch Running past the end of the file exception
+                if found + found_clip_f(2) > length(fish_id_order_check)
+                    found_clip_f = [found_clip_f(2)+1 found_clip_f(2)+1];
+                    break
+                end
+            end
         end
         
         % Now set values between these sections to NaN
@@ -175,6 +184,16 @@ clear a e ans data_type data_type_errors f fid folder_open folder_path ...
     lines_per_sheet O order_errors order_errors_size progress
 
 %% Reshape The Data 
+
+% Check that the tracking start's with fish 1 
+if fish_id(1) ~= 1 % if not 
+   crop = find(fish_id == 1,1,'first') - 1; % find just before fish 1   
+   % Crop all of the data 
+       delta_px(1:crop) = []; 
+       fish_id(1:crop) = []; 
+       time(1:crop) = []; 
+       
+end 
 
 % Check the number of frames per fish is correct 
 frames_per_fish = zeros(1,max(fish_id)); 
@@ -723,7 +742,7 @@ for f = 1:max(experiment_tags) % For each experiment
 end 
 delta_px_sq_sec_smooth = delta_px_sq_sec_smooth{end,1}; % Keep merged data 
 
-% Normalise for time (% of time active) 
+% Normalise for time (% of time active) - CHECK FOR MULTIPLE GROUPS 
 lb_frames_diff = diff(lb_frames); 
 for e = 1:max(experiment_tags) % for each experiment
     for g = 1:max(group_tags) % for each group
@@ -761,9 +780,9 @@ cmap_2(1,:) = cmap;
 cmap_2(2,:) = [25 25 112]/255; % midnight blue 
 
 % Selecting a time window 
-% days = [2 3]; nights = [2 3]; 
-% time_window(1) = min([days_crop(days) nights_crop(nights)]);  
-% time_window(2) = max([days_crop(days) nights_crop(nights)]); 
+days = [2 3]; nights = [2 3]; 
+time_window(1) = min([days_crop(days) nights_crop(nights)]);  
+time_window(2) = max([days_crop(days) nights_crop(nights)]); 
 
 % Clean up
 clear f p e g t start  
@@ -1016,10 +1035,8 @@ box off; set(gca, 'Layer','top'); set(gca,'Fontsize',32);
 [~,icons,plots,~] = legend(legend_cols,legend_cell,'Location','northwest');
 legend('boxoff'); 
 set(icons(1:max(group_tags)),'Fontsize',32) ; set(plots,'LineWidth',3);
-if time_window(1) == 1 && time_window(2) = max(days_ 
 axis([lb_sec(time_window(1)) (lb_sec(time_window(2)+1)-1) 0 y_lims(2)]);
 x = lb_sec(time_window(1)):(60*60*12):(lb_sec(time_window(2)+1)-1); 
-
 set(gca,'XTick',x); 
 set(gca,'XTickLabel',{(0:size(x,2)-1)*12})
 xlabel('Time (Hours)','Fontsize',32);
@@ -1029,11 +1046,15 @@ clear a g h icons plots str legend_cell legend_cols legend_lines n r x y_lims
 
 %% Figure - Parameter Distributions V3
     % Uses a log axis for plots 
+    % Plot's Std Rather than SEM 
+        % Note I've left the SEM Code in as this will probably be better
+        % for more groups 
     
 figure; 
-for p = 1:size(parameters,2) % For each parameter
-    subplot(3,4,p); hold on; col = 1; counter = 1; 
+for p = 1:size(parameters,2) - 2 % For each parameter
+    subplot(2,5,p); hold on; col = 1; counter = 1; 
     clear data legend_lines legend_cols legend_cell r sample crop y_lims spread_cols;
+    box off; set(gca, 'Layer','top'); set(gca,'Fontsize',12);
     title(parameters{p}); % Add title
     
     if ismember(p,[7:9 11:12]) == 0 % For most parameters 
@@ -1065,20 +1086,20 @@ for p = 1:size(parameters,2) % For each parameter
            col = 1;  
         for g = 1:max(group_tags) % For each group
             for t = 1:2 % For day/night
-                if t == 1 % for day 
-                    sample = size(find(data{2,t} == g & data{3,t} == e),1)/...
-                        size(days,2);
-                else % for night
-                    sample = size(find(data{2,t} == g & data{3,t} == e),1)/...
-                        size(nights,2);
-                end
-                    % Find the number of fish
+                  % SEM 
+%                 if t == 1 % for day 
+%                     sample = size(find(data{2,t} == g & data{3,t} == e),1)/...
+%                         size(days,2);
+%                 else % for night
+%                     sample = size(find(data{2,t} == g & data{3,t} == e),1)/...
+%                         size(nights,2);
+%                 end
+%                     Find the number of fish
                 
                 legend_lines(col) = shadedErrorBar((1:crop)/unit_conversion(1,p),...
                     nanmean(data{1,t}(data{2,t} == g & data{3,t} == e,1:crop)),...
-                    nanstd(data{1,t}(data{2,t} == g & data{3,t} == e,1:crop))/...
-                    sqrt(sample),...
-                    {'color',cmap_2(col,:)+(1-cmap_2(col,:))*(1-(1/e^.5))}); 
+                    nanstd(data{1,t}(data{2,t} == g & data{3,t} == e,1:crop))...%/sqrt(sample)
+                    ,'lineprops',{'color',cmap_2(col,:)+(1-cmap_2(col,:))*(1-(1/e^.5))}); 
                 % Plot - note that this is now in appropriate units
                     % (eg.seconds) 
                 
@@ -1130,25 +1151,25 @@ for p = 1:size(parameters,2) % For each parameter
           spread_cols = plotSpread(squeeze(nanmean(permute(parameter_comparisons{p}(experiment_tags(group_tags == g) == e,:,days_crop(days)),[1 3 2]),2))/...
                 unit_conversion(1,p),...
                 'distributionColors',cmap_2(1:2:size(cmap_2,1),:)+(1-cmap_2(1:2:size(cmap_2,1),:))*(1-(1/e^.5)),'showMM',2); % Scatter day data  
-            spread_cols{2}.LineWidth = 3; % Change marker width 
+            spread_cols{2}.LineWidth = 3; spread_cols{2}.Color = [1 0.5 0]; % Change marker properties  
             spread_cols = plotSpread(squeeze(nanmean(permute(parameter_comparisons{p}(experiment_tags(group_tags == g) == e,:,nights_crop(nights)),[1 3 2]),2))/...
                 unit_conversion(1,p),...
                 'distributionColors',cmap_2(2:2:size(cmap_2,1),:)+(1-cmap_2(2:2:size(cmap_2,1),:))*(1-(1/e^.5)),'showMM',2); % Scatter night data 
-            spread_cols{2}.LineWidth = 3; % Change marker width
+            spread_cols{2}.LineWidth = 3; spread_cols{2}.Color = [1 0.5 0]; % Change marker properties
         end 
         ylabel(units(p),'Fontsize',12); % Y labels 
         set(gca,'xticklabel',geno_list.colheaders,'Fontsize',12); % Name each group  
     end
-    if p == 4 % For the 4th parameter - add a legend
-        [~,~,~,~] = legend(legend_cols,legend_cell,'Location','northeast');
+    if p == 5 % For the 5th parameter - add a legend 
+        [~,icons,~,~] = legend(legend_cols,legend_cell,'Location','northeast');
         legend('boxoff'); 
+        set(icons(1:max(group_tags)*2),'Fontsize',13); 
+        set(icons((max(group_tags)*2)+1:2:end),'LineWidth',3)
     end
-    
-    box off; set(gca, 'Layer','top'); set(gca,'Fontsize',12);
-    
+        
 end
 
-clear col g p spread_cols t xl
+clear col g p spread_cols t xl icons 
 
 %% Stats - Two Way ANOVA 
 
@@ -1180,13 +1201,13 @@ if size(days_crop(days),2) == size(nights_crop(nights),2) % If there are an equa
 end 
 
 % Pre-allocation (Need to test to find x)  
-for p = 1:size(parameters,2) % For each parameter 
+for p = 1:size(parameters,2) - 2 % For each parameter 
     twa.p(1:15,p) = NaN; % Comparisons x parameters  
     twa.stats{p} = []; % Stats structure 
 end 
 
 % Calculations - account for experiment tags
-for p = 1:size(parameters,2) % For each parameter
+for p = 1:size(parameters,2)-2 % For each parameter
     clear scrap;
     scrap = parameter_comparisons{p}(:,:,time_window(1):time_window(2));
     scrap = scrap(:)'; % Vectorise  
@@ -1226,7 +1247,7 @@ clear anova_development anova_group anova_time anova_experiment p scrap t
 
 %% Stats - KW 
 
-for p = 1:size(parameters,2) % For each parameter
+for p = 1:size(parameters,2)-2 % For each parameter
     clear data; c = 1; d = 1; % Start counters 
     if ismember(p,[7:9 11:12]) == 0 % For most parameters 
         data{1,1} = reshape(permute(parameter_dists{p}(:,:,days_crop(days)),[1 3 2]),...

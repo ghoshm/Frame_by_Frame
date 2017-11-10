@@ -39,13 +39,13 @@ disp(horzcat('Running File ',folder_path)); % Report file choice
 
 % Pre-allocation
 time = nan(size(folder_open,1)*lines_per_sheet,1,'single'); % time {1}
-pause(30); % Wait for memory 
+%pause(30); % Wait for memory 
 data_type = nan(size(folder_open,1)*lines_per_sheet,1,'single'); % Data type {2} 
-pause(30); % Wait for memory 
+%pause(30); % Wait for memory 
 fish_id = nan(size(folder_open,1)*lines_per_sheet,1,'single'); % Fish id {3}
-pause(30); % Wait for memory 
+%pause(30); % Wait for memory 
 delta_px = nan(size(folder_open,1)*lines_per_sheet,1,'single'); % Delta px {4}
-pause(30); % Wait for memory 
+%pause(30); % Wait for memory 
 sheet_names = cell(size(folder_open,1),1); % Excel sheet names  
 
 % Ordering by File Name 
@@ -100,30 +100,39 @@ for f = O' % For each Excel file
         isnan(fish_id_order_check) == 0,1,'first'); % Find the first frame drops 
     
     while isempty(found) == 0 % While there are dropped frames 
-        
+
         % Use a sliding window to find where the pattern normalises
         % Cut backwards
         found_clip_b = [191 1];
-        while sum(fish_id_order_check(found - found_clip_b(1):found - found_clip_b(2))) ~= 191
-            found_clip_b = found_clip_b + 1; % Slide window
-            
-            % Catch Running past the start of the file exception
-            if found - found_clip_b(1) <= 1
-                found_clip_b = [found_clip_b(1) + 2 found_clip_b(1) + 2];
-                break
-            end 
+        if found - found_clip_b(1) < 1
+            found_clip_b = [found + 1 found + 1]; 
+        else
+            while sum(fish_id_order_check(found - found_clip_b(1):found - found_clip_b(2))) ~= 191
+                found_clip_b = found_clip_b + 1; % Slide window
+                
+                % Catch Running past the start of the file exception
+                if found - found_clip_b(1) < 1
+                    found_clip_b = [found_clip_b(1) + 1 found_clip_b(1) + 1];
+                    break
+                end
+            end
         end
         
         % Cut forwards
         found_clip_f = [1 191];
-        while sum(fish_id_order_check(found + found_clip_f(1):found + found_clip_f(2))) ~= 191
-            found_clip_f = found_clip_f + 1; % Slide window 
-            
-            % Catch Running past the end of the file exception 
-             if found + found_clip_f(2) >= size(fish_id_order_check,1)
-                 found_clip_f = [found_clip_f(2)+2 found_clip_f(2)+2]; 
-                 break 
-             end 
+        if found + found_clip_f(2) > length(fish_id_order_check)
+            found_clip_f = [length(fish_id_order_check) - found + 2 ... 
+                length(fish_id_order_check) - found + 2]; 
+        else
+            while sum(fish_id_order_check(found + found_clip_f(1):found + found_clip_f(2))) ~= 191
+                found_clip_f = found_clip_f + 1; % Slide window
+                
+                % Catch Running past the end of the file exception
+                if found + found_clip_f(2) > length(fish_id_order_check)
+                    found_clip_f = [found_clip_f(2)+1 found_clip_f(2)+1];
+                    break
+                end
+            end
         end
         
         % Now set values between these sections to NaN
@@ -175,6 +184,16 @@ clear a e ans data_type data_type_errors f fid folder_open folder_path ...
     lines_per_sheet O order_errors order_errors_size progress
 
 %% Reshape The Data 
+
+% Check that the tracking start's with fish 1 
+if fish_id(1) ~= 1 % if not 
+   crop = find(fish_id == 1,1,'first') - 1; % find just before fish 1   
+   % Crop all of the data 
+       delta_px(1:crop) = []; 
+       fish_id(1:crop) = []; 
+       time(1:crop) = []; 
+   clear crop; 
+end 
 
 % Check the number of frames per fish is correct 
 frames_per_fish = zeros(1,max(fish_id)); 

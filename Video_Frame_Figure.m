@@ -16,7 +16,7 @@ fps = 25;
 example_frames = 10:14; 
 
 % Plotting - Data 
-figure; hold on; 
+figure; hold on;  set(gca, 'FontName', 'Calibri'); 
 plot(scrap,'color',cmap(1,:),'linewidth',3); 
 
 % Plotting - Marks 

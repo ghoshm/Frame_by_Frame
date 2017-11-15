@@ -388,7 +388,7 @@ parfor f = 1:size(delta_px_sq,2) % For each fish
     end 
     
     % Ends - ensures no bouts are lost at the end 
-    if delta_px_sq(end,f) > 0 % If active in last bin 
+    if delta_px_sq(size(delta_px_sq,1),f) > 0 % If active in last bin 
         wake_cells{1,f}(:,2) = [find(delta_px_sq_scrap(:,f) == - 1);...
             size(delta_px_sq,1)]; % Find active bout ends
         sleep_cells{1,f}(:,2) = find(delta_px_sq_scrap(:,f) == 1); % Find sleep bout ends

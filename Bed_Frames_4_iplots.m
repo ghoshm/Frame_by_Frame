@@ -5,6 +5,7 @@
 figure; 
 for p = 1:size(parameter_comparisons,2) - 2 % For each parameter
     subplot(2,5,p); hold on; clear scrap; counter = 1; 
+    set(gca,'FontName','Calibri'); % Set Font  
     title(parameters{p}); % Add title
     
     % Plot parameters
@@ -20,8 +21,8 @@ for p = 1:size(parameter_comparisons,2) - 2 % For each parameter
                 'color',cmap(g,:)+(1-cmap(g,:))*(1-(1/e^.5)),'linewidth',3);
 
             if e == 1 % For the first experiment 
-            legend_cell{g} = horzcat(geno_list.colheaders{g},', n = (',...
-                num2str(size(find(group_tags == g),1)),')');
+            legend_cell{g} = horzcat(geno_list.colheaders{g},', n = ',...
+                num2str(size(find(group_tags == g),1)));
             % Append the group size to each group name
             end 
             
@@ -51,7 +52,7 @@ for p = 1:size(parameter_comparisons,2) - 2 % For each parameter
     end
     
     % Figure Looks
-    if p == 4 % For the 4th parameter
+    if p == 5 % For the 4th parameter
         [~,~,~,~] = legend(legend_cell,'Location','northwest'); % Generate axis
         legend('boxoff'); % Turn legend off  
     end
@@ -70,7 +71,7 @@ clear p scrap g legend_lines y_lims a n r night_start count
     % Crops the activity so that only points with data from all experiments
         % are shown 
 
-figure; hold on; clear legend_lines  
+figure; hold on; clear legend_lines; set(gca,'FontName','Calibri'); % Set Font  
 for e = 1:max(experiment_tags) % For each experiment
     for g = 1:max(group_tags) % For each group
         

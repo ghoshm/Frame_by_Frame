@@ -794,13 +794,12 @@ else
 end
 
 % Selecting a time window 
-days = [1]; nights = [1]; % Hard Coded 
+days = [1 2 3 4]; nights = [1 2 3]; % Hard Coded 
 time_window(1) = min([days_crop(days) nights_crop(nights)]);  
 time_window(2) = max([days_crop(days) nights_crop(nights)]); 
 
 % Clean up
 clear f p e g t start  
-
 %% Parameters Across Time 
 
 % Removing time points with no data

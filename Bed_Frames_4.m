@@ -299,13 +299,105 @@ clear a boundary start_time time_counter time time_sq t
 %     prctile(scrap(:)',[0 10 20 30 40 50 60 70 80 90])
 %     prctile(scrap(:)',[0 10 20 30 40 50 60 70 80 90])
 
-delta_px_sq(:,1:96) = []; % Remove the unused box 
+%delta_px_sq(:,1:96) = []; % Remove the unused box 
+delta_px_sq(:,97:end) = []; 
 delta_px_sq = delta_px_sq - 1; % Remove pixel noise 
 
 % Now normalise for each fish 
 % scrap = delta_px_sq; scrap(scrap == 0) = NaN; 
 % delta_px_sq = delta_px_sq./nanmedian(scrap);
 % clear scrap 
+
+%% Remove "Noise" - set values to zero
+% 1. Abnormally high viewpoint values
+% 2. Topping up Fish Water
+top_up = [2 4]; % Hard coded - alter to light boundaries where you topped up fish water. 
+% E.g. Day 2 and 3 (top_up = [2 4]). 
+% E.g. Not topped up (top_up = []). 
+
+% A hard threshold is a simple solution, though removing whole bouts
+% including these values is best as it avoids leaving "cut bouts" 
+% From my 3 WT experiments (with lids so no hands), the maximum value I
+% Observe is 165px.
+% From a PTZ Dose response (you would expect higher values) the data
+% doesn't exceed this
+
+% 1. Remove High Viewpoint values
+% Note that this is adapted from the parameter extraction code (below)
+wake_cells = cell(1,size(delta_px_sq,2)); % Wake Cells (bout parameters)
+
+% Finding transitions
+delta_px_sq_scrap = delta_px_sq;
+delta_px_sq_scrap(delta_px_sq_scrap > 0) = 1; % Find active frames
+delta_px_sq_scrap = diff(delta_px_sq_scrap); % Diff to find transitions
+% 1 = inactive to active
+% -1 = active to inactive
+
+for f = 1:size(delta_px_sq,2) % For each fish
+    % Note this this runs apporximately twice as fast as just using a
+    % For loop
+    
+    % Starts - ensures no bouts are lost at the start
+    if  delta_px_sq(1,f) > 0 % If active in first bin
+        wake_cells{1,f}(:,1) = [1 ; find(delta_px_sq_scrap(:,f) == 1)+1]; % Find active bout starts
+    else % Ie. if inactive in first bin
+        wake_cells{1,f}(:,1) = find(delta_px_sq_scrap(:,f) == 1)+1; % Find active bout starts
+    end
+    
+    % Ends - ensures no bouts are lost at the end
+    if delta_px_sq(size(delta_px_sq,1),f) > 0 % If active in last bin
+        wake_cells{1,f}(:,2) = [find(delta_px_sq_scrap(:,f) == - 1);...
+            size(delta_px_sq,1)]; % Find active bout ends
+    else
+        wake_cells{1,f}(:,2) = find(delta_px_sq_scrap(:,f) == - 1);
+    end
+    
+    % Parameter extraction
+    wake_cells{1,f}(:,3) = NaN; % Pre-allocate
+    
+    % Active bouts
+    for b = 1:size(wake_cells{1,f},1) % For each active bout
+        wake_cells{1,f}(b,3) = nanmax(delta_px_sq(wake_cells{1,f}(b,1):...
+            wake_cells{1,f}(b,2),f)); % Max
+        
+        if wake_cells{1,f}(b,3) > 200 % Hard coded threshold
+            delta_px_sq(wake_cells{1,f}(b,1):...
+                wake_cells{1,f}(b,2),f) = 0; % Bin to zero
+        end
+        
+    end
+    
+end
+
+clear b delta_px_sq_scrap f wake_cells
+
+% 2. Filter out Hands & Truncated Bouts 
+if isempty(top_up) == 0 % if fish h20 was topped up 
+    top_up_bin = nan(size(top_up,2),2,'single'); % pre-allocate (top ups x start/stop) 
+    
+    fps = round(1/((nanmean(diff(time_sq_max)))*(60*60)),1); % Calculate frame rate
+    
+    for t = 1:size(top_up,2) % For each top up 
+        [~,top_up_bin(t,1)] = find(diff(max(delta_px_sq(lb(top_up(t)):lb(top_up(t)+1),:)')) == ...
+            max(diff(max(delta_px_sq(lb(top_up(t)):lb(top_up(t)+1),:)'))),1,'first'); % find max 
+        top_up_bin(t,1) = lb(top_up(t)) + top_up_bin(t,1) - (fps*15); % go 15s further back 
+        [~,top_up_bin(t,2)] = find(diff(max(delta_px_sq(lb(top_up(t)):lb(top_up(t)+1),:)')) == ...
+            min(diff(max(delta_px_sq(lb(top_up(t)):lb(top_up(t)+1),:)'))),1,'last'); % find end of top up 
+        top_up_bin(t,2) = lb(top_up(t)) + top_up_bin(t,2) + (fps*60); % go 45s further forwards 
+        
+        for f = 1:size(delta_px_sq,2) % for each fish 
+            if delta_px_sq(top_up_bin(t,1),f) == 0 && delta_px_sq(top_up_bin(t,2),f) == 0 
+                delta_px_sq(top_up_bin(t,1):top_up_bin(t,2),f) = 0; % set these values to zero 
+            else % if they have bouts overlapping with these cuts 
+                delta_px_sq(top_up_bin(t,1)- ...
+                    (find(flip(delta_px_sq(1:top_up_bin(t,1),f)) == 0,1,'first')-2):...
+                        top_up_bin(t,2) + (find(delta_px_sq(top_up_bin(t,2):end,f) == 0,1,'first')-2),f) = 0; 
+            end 
+        end 
+    end
+end
+
+clear f fps t top_up
 
 %% Group the data by condition 
 
@@ -405,6 +497,18 @@ parfor f = 1:size(delta_px_sq,2) % For each fish
     wake_cells{1,f}(:,3) = (wake_cells{1,f}(:,2)+1) - wake_cells{1,f}(:,1); % Wake Bout Length 
     sleep_cells{1,f}(:,3) = (sleep_cells{1,f}(:,2)+1) - sleep_cells{1,f}(:,1); % Sleep Bout Length 
 
+    % Removing "Hands" - setting length to NaN
+    try % "check" if the top up variable exists  
+        for t = 1:size(top_up_bin,1) % for each top up
+            temp = sleep_cells{1,f}(sleep_cells{1,f}(:,3) >= ...
+                diff(top_up_bin(t,:)),1:2); % filter for bouts long enough
+            idx = knnsearch(temp,top_up_bin(t,:)); % find the best match among filtered bouts
+            idx = knnsearch(sleep_cells{1,f}(:,1:2), temp(idx,:)); % find this in the full set
+            sleep_cells{1,f}(idx,3) = NaN; % set length to NaN
+        end
+    catch
+    end
+    
     % Active bouts 
     for b = 1:size(wake_cells{1,f},1) % For each active bout
         wake_cells{1,f}(b,4) = nanmean(delta_px_sq(wake_cells{1,f}(b,1):...
@@ -446,10 +550,12 @@ for f = 1:size(delta_px_sq,2) % For each fish
     
     % Inactive Bouts 
     for b = 1:size(sleep_cells{1,f},1) % For each sleep bout
-        parameter_time{10}(sleep_cells{1,f}(b,1),f) = ...
-            sleep_cells{1,f}(b,3); % Fill in bout length
-        parameter_time{11}(sleep_cells{1,f}(b,1),f) = 1; % No. of Inactive Bouts
-        parameter_time{12}(sleep_cells{1,f}(b,1):sleep_cells{1,f}(b,2),f) = 1; % Total Time Inactive
+        if isnan(sleep_cells{1,f}(b,3)) == 0 % check it's not a "hand artefact"
+            parameter_time{10}(sleep_cells{1,f}(b,1),f) = ...
+                sleep_cells{1,f}(b,3); % Fill in bout length
+            parameter_time{11}(sleep_cells{1,f}(b,1),f) = 1; % No. of Inactive Bouts
+            parameter_time{12}(sleep_cells{1,f}(b,1):sleep_cells{1,f}(b,2),f) = 1; % Total Time Inactive
+        end
     end
     
     disp(horzcat('Calculated parameters across time for fish = ',num2str(f),...
@@ -462,8 +568,8 @@ clear b delta_px_sq_scrap f p
 %% Statistics & Plots - Variables 
 
 % Hard Code your periods of interest 
-days = [1 2]; % Hard code 
-nights = [1]; % Hard code 
+days = [1 2 3 4]; % Hard code 
+nights = [1 2 3]; % Hard code 
 
 % Determine day/night order
     % Note that dn currently assumes the experiment starts during the day
@@ -794,7 +900,7 @@ else
 end
 
 % Selecting a time window 
-days = [1]; nights = [1]; % Hard Coded 
+days = [2 3]; nights = [2 3]; % Hard Coded 
 time_window(1) = min([days_crop(days) nights_crop(nights)]);  
 time_window(2) = max([days_crop(days) nights_crop(nights)]); 
 
@@ -1150,9 +1256,12 @@ for p = 1:size(parameters,2) - 2 % For each parameter
        end 
         axis([1/unit_conversion(1,p) crop/unit_conversion(1,p) ...
             min(y_lims(2,:)) max(y_lims(1,:))]); % Set axis limits 
+        try
         set(gca,'XTick',...
             [1/unit_conversion(1,p), 1/unit_conversion(1,p)*10,...
                 crop/unit_conversion(1,p)]); % set x tick labels 
+        catch 
+        end 
         % Set decimal places depending on units 
         if unit_conversion(1,p) > 1 
              xtickformat('%.2f');
@@ -1275,9 +1384,12 @@ for p = 1:size(parameters,2) - 2 % For each parameter
        end 
         axis([1/unit_conversion(1,p) crop/unit_conversion(1,p) ...
             min(y_lims(2,:)) max(y_lims(1,:))]); % Set axis limits 
+        try
         set(gca,'XTick',...
             [1/unit_conversion(1,p), 1/unit_conversion(1,p)*10,...
                 crop/unit_conversion(1,p)]); % set x tick labels 
+        catch 
+        end 
         % Set decimal places depending on units 
         if unit_conversion(1,p) > 1 
              xtickformat('%.2f');

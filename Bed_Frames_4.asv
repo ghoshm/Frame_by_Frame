@@ -299,8 +299,8 @@ clear a boundary start_time time_counter time time_sq t
 %     prctile(scrap(:)',[0 10 20 30 40 50 60 70 80 90])
 %     prctile(scrap(:)',[0 10 20 30 40 50 60 70 80 90])
 
-%delta_px_sq(:,1:96) = []; % Remove the unused box 
-delta_px_sq(:,97:end) = []; 
+delta_px_sq(:,1:96) = []; % Remove the unused box 
+%delta_px_sq(:,97:end) = []; 
 delta_px_sq = delta_px_sq - 1; % Remove pixel noise 
 
 % Now normalise for each fish 
@@ -311,7 +311,7 @@ delta_px_sq = delta_px_sq - 1; % Remove pixel noise
 %% Remove "Noise" - set values to zero
 % 1. Abnormally high viewpoint values
 % 2. Topping up Fish Water
-top_up = [2 4]; % Hard coded - alter to light boundaries where you topped up fish water. 
+top_up = []; % Hard coded - alter to light boundaries where you topped up fish water. 
 % E.g. Day 2 and 3 (top_up = [2 4]). 
 % E.g. Not topped up (top_up = []). 
 
@@ -373,17 +373,17 @@ clear b delta_px_sq_scrap f wake_cells
 
 % 2. Filter out Hands & Truncated Bouts 
 if isempty(top_up) == 0 % if fish h20 was topped up 
-    top_up_bin = nan(size(top_up,2),2,'single'); % pre-allocate 
+    top_up_bin = nan(size(top_up,2),2,'single'); % pre-allocate (top ups x start/stop) 
     
     fps = round(1/((nanmean(diff(time_sq_max)))*(60*60)),1); % Calculate frame rate
     
-    for t = size(top_up,2) % For each top up 
+    for t = 1:size(top_up,2) % For each top up 
         [~,top_up_bin(t,1)] = find(diff(max(delta_px_sq(lb(top_up(t)):lb(top_up(t)+1),:)')) == ...
             max(diff(max(delta_px_sq(lb(top_up(t)):lb(top_up(t)+1),:)'))),1,'first'); % find max 
-        top_up_bin(t,1) = top_up_bin(t,1) - (fps*30); % go 30s further back 
+        top_up_bin(t,1) = lb(top_up(t)) + top_up_bin(t,1) - (fps*15); % go 15s further back 
         [~,top_up_bin(t,2)] = find(diff(max(delta_px_sq(lb(top_up(t)):lb(top_up(t)+1),:)')) == ...
             min(diff(max(delta_px_sq(lb(top_up(t)):lb(top_up(t)+1),:)'))),1,'last'); % find end of top up 
-        top_up_bin(t,2) = top_up_bin(t,2) + (fps*30); % go 30s further forwards 
+        top_up_bin(t,2) = lb(top_up(t)) + top_up_bin(t,2) + (fps*60); % go 45s further forwards 
         
         for f = 1:size(delta_px_sq,2) % for each fish 
             if delta_px_sq(top_up_bin(t,1),f) == 0 && delta_px_sq(top_up_bin(t,2),f) == 0 
@@ -395,7 +395,12 @@ if isempty(top_up) == 0 % if fish h20 was topped up
             end 
         end 
     end
+    
+else % if not topped up 
+    top_up_bin = []; % store a blank variable 
 end
+
+clear f fps t top_up
 
 %% Group the data by condition 
 
@@ -495,6 +500,18 @@ parfor f = 1:size(delta_px_sq,2) % For each fish
     wake_cells{1,f}(:,3) = (wake_cells{1,f}(:,2)+1) - wake_cells{1,f}(:,1); % Wake Bout Length 
     sleep_cells{1,f}(:,3) = (sleep_cells{1,f}(:,2)+1) - sleep_cells{1,f}(:,1); % Sleep Bout Length 
 
+    % Removing "Hands" - setting length to NaN
+    try % "check" if the top up variable exists  
+        for t = 1:size(top_up_bin,1) % for each top up
+            temp = sleep_cells{1,f}(sleep_cells{1,f}(:,3) >= ...
+                diff(top_up_bin(t,:)),1:2); % filter for bouts long enough
+            idx = knnsearch(temp,top_up_bin(t,:)); % find the best match among filtered bouts
+            idx = knnsearch(sleep_cells{1,f}(:,1:2), temp(idx,:)); % find this in the full set
+            sleep_cells{1,f}(idx,3) = NaN; % set length to NaN
+        end
+    catch
+    end
+    
     % Active bouts 
     for b = 1:size(wake_cells{1,f},1) % For each active bout
         wake_cells{1,f}(b,4) = nanmean(delta_px_sq(wake_cells{1,f}(b,1):...
@@ -536,10 +553,12 @@ for f = 1:size(delta_px_sq,2) % For each fish
     
     % Inactive Bouts 
     for b = 1:size(sleep_cells{1,f},1) % For each sleep bout
-        parameter_time{10}(sleep_cells{1,f}(b,1),f) = ...
-            sleep_cells{1,f}(b,3); % Fill in bout length
-        parameter_time{11}(sleep_cells{1,f}(b,1),f) = 1; % No. of Inactive Bouts
-        parameter_time{12}(sleep_cells{1,f}(b,1):sleep_cells{1,f}(b,2),f) = 1; % Total Time Inactive
+        if isnan(sleep_cells{1,f}(b,3)) == 0 % check it's not a "hand artefact"
+            parameter_time{10}(sleep_cells{1,f}(b,1),f) = ...
+                sleep_cells{1,f}(b,3); % Fill in bout length
+            parameter_time{11}(sleep_cells{1,f}(b,1),f) = 1; % No. of Inactive Bouts
+            parameter_time{12}(sleep_cells{1,f}(b,1):sleep_cells{1,f}(b,2),f) = 1; % Total Time Inactive
+        end
     end
     
     disp(horzcat('Calculated parameters across time for fish = ',num2str(f),...
@@ -549,11 +568,11 @@ end
 toc
 clear b delta_px_sq_scrap f p   
 
-%% Statistics & Plots - Variables 
+%% Statistics & Plots - Variables (Keep working on NaN values from here - 171128)
 
 % Hard Code your periods of interest 
-days = [1 2 3 4]; % Hard code 
-nights = [1 2 3]; % Hard code 
+days = [1 2]; % Hard code 
+nights = [1]; % Hard code 
 
 % Determine day/night order
     % Note that dn currently assumes the experiment starts during the day
@@ -884,7 +903,7 @@ else
 end
 
 % Selecting a time window 
-days = [2 3]; nights = [2 3]; % Hard Coded 
+days = [1]; nights = [1]; % Hard Coded 
 time_window(1) = min([days_crop(days) nights_crop(nights)]);  
 time_window(2) = max([days_crop(days) nights_crop(nights)]); 
 
@@ -1412,7 +1431,7 @@ end
 clear col g p spread_cols t xl icons 
 
 %% Stats - Two Way ANOVA 
-
+    % Note that when first don't have bouts in a time window 
 % Define groups 
 anova_group = []; % group  
 anova_experiment = []; % experiments 
@@ -1430,7 +1449,8 @@ for t = time_window(1):time_window(2) % For each time window
 end 
 anova_time = anova_time(:)'; % Vectorise 
 
-if size(days_crop(days),2) == size(nights_crop(nights),2) % If there are an equal number of windows 
+if size(days_crop(days),2) == size(nights_crop(nights),2) &&... % If there are an equal number of windows 
+        size(days_crop(days),2) > 1 % & there is more than one day 
     anova_development = []; % development
     anova_development = zeros(1,size(anova_group,2)); % Pre-allocate 
     d = 1:size(anova_development,2)/(size(time_window(1):time_window(2),2)/2):...
@@ -1462,7 +1482,8 @@ for p = 1:size(parameters,2)-2 % For each parameter
     
     scrap(isnan(scrap)) = []; 
     
-    if size(days_crop(days),2) == size(nights_crop(nights),2) % If comparing development 
+    if size(days_crop(days),2) == size(nights_crop(nights),2) &&... % If comparing development 
+            size(days_crop(days),2) > 1 
         if max(experiment_tags) > 1 % If comparing experiments 
             [twa.p(:,p),~,twa.stats{p}] = anovan(scrap,...
                 {anova_group,anova_time,anova_development,anova_experiment},'display','off','model','full');

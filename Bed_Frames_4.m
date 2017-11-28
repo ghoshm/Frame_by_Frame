@@ -299,8 +299,8 @@ clear a boundary start_time time_counter time time_sq t
 %     prctile(scrap(:)',[0 10 20 30 40 50 60 70 80 90])
 %     prctile(scrap(:)',[0 10 20 30 40 50 60 70 80 90])
 
-%delta_px_sq(:,1:96) = []; % Remove the unused box 
-delta_px_sq(:,97:end) = []; 
+delta_px_sq(:,1:96) = []; % Remove the unused box 
+%delta_px_sq(:,97:end) = []; 
 delta_px_sq = delta_px_sq - 1; % Remove pixel noise 
 
 % Now normalise for each fish 
@@ -311,7 +311,7 @@ delta_px_sq = delta_px_sq - 1; % Remove pixel noise
 %% Remove "Noise" - set values to zero
 % 1. Abnormally high viewpoint values
 % 2. Topping up Fish Water
-top_up = [2 4]; % Hard coded - alter to light boundaries where you topped up fish water. 
+top_up = []; % Hard coded - alter to light boundaries where you topped up fish water. 
 % E.g. Day 2 and 3 (top_up = [2 4]). 
 % E.g. Not topped up (top_up = []). 
 
@@ -395,6 +395,9 @@ if isempty(top_up) == 0 % if fish h20 was topped up
             end 
         end 
     end
+    
+else % if not topped up 
+    top_up_bin = []; % store a blank variable 
 end
 
 clear f fps t top_up
@@ -565,11 +568,11 @@ end
 toc
 clear b delta_px_sq_scrap f p   
 
-%% Statistics & Plots - Variables 
+%% Statistics & Plots - Variables (Keep working on NaN values from here - 171128)
 
 % Hard Code your periods of interest 
-days = [1 2 3 4]; % Hard code 
-nights = [1 2 3]; % Hard code 
+days = [1 2]; % Hard code 
+nights = [1]; % Hard code 
 
 % Determine day/night order
     % Note that dn currently assumes the experiment starts during the day
@@ -900,7 +903,7 @@ else
 end
 
 % Selecting a time window 
-days = [2 3]; nights = [2 3]; % Hard Coded 
+days = [1]; nights = [1]; % Hard Coded 
 time_window(1) = min([days_crop(days) nights_crop(nights)]);  
 time_window(2) = max([days_crop(days) nights_crop(nights)]); 
 
@@ -1428,7 +1431,13 @@ end
 clear col g p spread_cols t xl icons 
 
 %% Stats - Two Way ANOVA 
-
+    % Note that when fish don't have bouts in a time window, they retain
+    % their default NaN value in parameter comparisons, then get filtered 
+    % and cause indexing problems 
+    % As these cases essentially indicate dead fish I've left the code as
+    % it is for now and would suggest excluding these fish in the genotype
+    % list
+    
 % Define groups 
 anova_group = []; % group  
 anova_experiment = []; % experiments 
@@ -1446,7 +1455,8 @@ for t = time_window(1):time_window(2) % For each time window
 end 
 anova_time = anova_time(:)'; % Vectorise 
 
-if size(days_crop(days),2) == size(nights_crop(nights),2) % If there are an equal number of windows 
+if size(days_crop(days),2) == size(nights_crop(nights),2) &&... % If there are an equal number of windows 
+        size(days_crop(days),2) > 1 % & there is more than one day 
     anova_development = []; % development
     anova_development = zeros(1,size(anova_group,2)); % Pre-allocate 
     d = 1:size(anova_development,2)/(size(time_window(1):time_window(2),2)/2):...
@@ -1478,7 +1488,8 @@ for p = 1:size(parameters,2)-2 % For each parameter
     
     scrap(isnan(scrap)) = []; 
     
-    if size(days_crop(days),2) == size(nights_crop(nights),2) % If comparing development 
+    if size(days_crop(days),2) == size(nights_crop(nights),2) &&... % If comparing development 
+            size(days_crop(days),2) > 1 
         if max(experiment_tags) > 1 % If comparing experiments 
             [twa.p(:,p),~,twa.stats{p}] = anovan(scrap,...
                 {anova_group,anova_time,anova_development,anova_experiment},'display','off','model','full');

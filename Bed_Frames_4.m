@@ -311,7 +311,7 @@ delta_px_sq = delta_px_sq - 1; % Remove pixel noise
 %% Remove "Noise" - set values to zero
 % 1. Abnormally high viewpoint values
 % 2. Topping up Fish Water
-top_up = []; % Hard coded - alter to light boundaries where you topped up fish water. 
+top_up = [2 4]; % Hard coded - alter to light boundaries where you topped up fish water. 
 % E.g. Day 2 and 3 (top_up = [2 4]). 
 % E.g. Not topped up (top_up = []). 
 
@@ -383,7 +383,7 @@ if isempty(top_up) == 0 % if fish h20 was topped up
         top_up_bin(t,1) = lb(top_up(t)) + top_up_bin(t,1) - (fps*15); % go 15s further back 
         [~,top_up_bin(t,2)] = find(diff(max(delta_px_sq(lb(top_up(t)):lb(top_up(t)+1),:)')) == ...
             min(diff(max(delta_px_sq(lb(top_up(t)):lb(top_up(t)+1),:)'))),1,'last'); % find end of top up 
-        top_up_bin(t,2) = lb(top_up(t)) + top_up_bin(t,2) + (fps*60); % go 45s further forwards 
+        top_up_bin(t,2) = lb(top_up(t)) + top_up_bin(t,2) + (fps*60); % go 60s further forwards 
         
         for f = 1:size(delta_px_sq,2) % for each fish 
             if delta_px_sq(top_up_bin(t,1),f) == 0 && delta_px_sq(top_up_bin(t,2),f) == 0 
@@ -568,11 +568,11 @@ end
 toc
 clear b delta_px_sq_scrap f p   
 
-%% Statistics & Plots - Variables (Keep working on NaN values from here - 171128)
+%% Statistics & Plots - Variables
 
 % Hard Code your periods of interest 
-days = [1 2]; % Hard code 
-nights = [1]; % Hard code 
+days = [1 2 3 4]; % Hard code 
+nights = [1 2 3]; % Hard code 
 
 % Determine day/night order
     % Note that dn currently assumes the experiment starts during the day
@@ -671,8 +671,10 @@ for f = 1:size(wake_cells,2) % For each fish
         parameter_matrix(f,10,t)...
             = nanmean(sleep_cells{1,f}(time_start:time_stop,3));
         % Number of bouts (11)
+            % Subtract number of NaN's (H20 Top up)
         parameter_matrix(f,11,t) = size(sleep_cells{1,f}...
-            (time_start:time_stop,3:end),1);
+            (time_start:time_stop,3:end),1)... 
+            - sum(isnan(sleep_cells{1,f}(time_start:time_stop,3))); 
         % Total time inactive (12) - sum of lengths
         parameter_matrix(f,12,t) = nansum(sleep_cells{1,f}...
             (time_start:time_stop,3),1);
@@ -781,6 +783,7 @@ clear a f p t
  group_tags = [];
  wake_cells = [];
  sleep_cells = [];
+ top_up_bin = []; 
  parameter_indicies = [];
  parameter_matrix = [];
  parameter_comparisons = cell(1,12);
@@ -800,6 +803,10 @@ clear a f p t
      parameter_indicies = [parameter_indicies experiment.parameter_indicies]; 
      parameter_matrix = [parameter_matrix ; experiment.parameter_matrix]; 
      delta_px_sq_sec_smooth{f,1} = experiment.delta_px_sq_sec_smooth; 
+     try
+         top_up_bin{1,f} = experiment.top_up_bin; 
+     catch
+     end
      
      % Nab variables 
      if f == 1 % For the first file 
@@ -856,20 +863,31 @@ for f = 1:max(experiment_tags) % For each experiment
 end 
 delta_px_sq_sec_smooth = delta_px_sq_sec_smooth{end,1}; % Keep merged data 
 
-% Normalise for time (% of time active) - CHECK FOR MULTIPLE GROUPS 
-lb_frames_diff = diff(lb_frames); 
-counter = 1; % start a counter  
-for g = 1:max(group_tags) % for each group  
-    for f = 1:size(find(group_tags == g),1) % for each fish 
+% Normalise for time (% of time active)
+lb_frames_diff = diff(lb_frames);
+counter = 1; top_up_counter = 1; % start counters 
+for g = 1:max(group_tags) % for each group
+    for f = 1:size(find(group_tags == g),1) % for each fish
         for t = 1:size(parameter_comparisons{1,8},3) % for each time window
-            parameter_comparisons{1,8}(f,g,t) = ...
-                (parameter_comparisons{1,8}(f,g,t)/...
-                    lb_frames_diff(t,experiment_tags(counter)))*100; 
-        end 
-    counter = counter + 1; % add to counter  
-    end 
-end 
-clear counter; 
+            if sum(isnan(sleep_cells{1,f}(parameter_indicies{2,f} == t,3))) == 0 % if there are no NaN Values 
+                parameter_comparisons{1,8}(f,g,t) = ...
+                    (parameter_comparisons{1,8}(f,g,t)/...
+                    lb_frames_diff(t,experiment_tags(counter)))*100;
+            else % If there are NaN values (water topped up) 
+                    % Subtract the time taken to top the water up 
+                parameter_comparisons{1,8}(f,g,t) = ...
+                    (parameter_comparisons{1,8}(f,g,t)/...
+                    (lb_frames_diff(t,experiment_tags(counter)) - ...
+                    diff(top_up_bin{1,experiment_tags(counter)}(top_up_counter,:))))*100;
+                top_up_counter = top_up_counter + 1; % add to counter 
+            end
+            
+        end
+        counter = counter + 1; % add to counter
+        top_up_counter = 1; % re-set counter 
+    end
+end
+clear counter top_up_counter;
 
 unit_conversion(1,8) = 1; units{8} = '% of Time'; % swap hours to % 
 unit_conversion(1,12) = 1; units{12} = '% of Time'; % swap hours to % 
@@ -884,7 +902,7 @@ for g = 1:max(group_tags) % For each group
 end
 
 % Remove experiment tags - Optional  
- experiment_tags(:,1) = 1;
+ %experiment_tags(:,1) = 1;
 
 % Possible color shading 
 %cmap(g,:)+(1-cmap(g,:))*(1-(1/e^.5))
@@ -903,12 +921,12 @@ else
 end
 
 % Selecting a time window 
-days = [1]; nights = [1]; % Hard Coded 
+days = [1 2 3 4]; nights = [1 2 3]; % Hard Coded 
 time_window(1) = min([days_crop(days) nights_crop(nights)]);  
 time_window(2) = max([days_crop(days) nights_crop(nights)]); 
 
 % Clean up
-clear f p e g t start  
+clear f p e g t start top_up_bin  
 
 %% Parameters Across Time 
 
@@ -982,6 +1000,7 @@ for p = find(parameter_smooth == 0) % For most parameters
                 if isempty(find(parameter_indicies{2,f} == t)) == 0 % If there are bouts
                     pd = fitdist(sleep_cells{1,f}(parameter_indicies{2,f}==t,3),'kernel','Width',1); % Fit
                     parameter_dists{p}(f,:,t) = pdf(pd,min(dist_boundaries(:,p)):max(dist_boundaries(:,p)));
+                    % Note that fitdist ignores NaN values (from water top up)
                 else % If there are no bouts 
                     parameter_dists{p}(f,:,t) = zeros(1,size(min(dist_boundaries(:,p)):...
                         max(dist_boundaries(:,p)),2)); % Fill with zeros 

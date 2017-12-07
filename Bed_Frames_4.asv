@@ -186,89 +186,83 @@ disp(horzcat('Ran File ',folder_path)); % Report file choice
 clear a e ans data_type data_type_errors f fid folder_open folder_path ...
     lines_per_sheet O order_errors order_errors_size progress
 
-%% Checking for Persistant Ordering Errors
-% At this point only one type of ordering error will remain
-% This will be the rare case where the ordering error bridges two Excel sheets
-% E.g. 171030_16
+%% Checking for Persistant Ordering Errors 
+    % At this point only one type of ordering error will remain 
+    % This will be the rare case where the ordering error bridges two Excel sheets
+    % E.g. 171030_16
+    % Check for remaining Errors 
 
-% Check for remaining Errors
-scrap = diff(isnan(fish_id));
+scrap = diff(isnan(fish_id)); 
 
-if size(unique(scrap),1) > 2
+if size(unique(scrap),1) > 2 
     
-    % Backwards
-    check(:,1) = find(scrap == 1);
-    check(:,2) = fish_id(scrap == 1);
+% Backwards
+check(:,1) = find(scrap == 1); 
+check(:,2) = fish_id(scrap == 1); 
+
+if isempty(find(check(:,2) ~= 192)) == 0 % If there are errors
+    err = find(check(:,2) ~= 192); 
+    fish_id_diff = diff(fish_id); 
     
-    if isempty(find(check(:,2) ~= 192)) == 0 % If there are errors
-        err = find(check(:,2) ~= 192);
-        fish_id_diff = diff(fish_id);
-        
-        for e = 1:size(err,1) % for each error
-            
-            % Use a sliding window to find where the pattern normalises
-            % Cut backwards
-            found = check(err(e,1),1);
-            found_clip_b = [191 1];
-            if found - found_clip_b(1) < 1
-                found_clip_b = [found + 1 found + 1];
-            else
-                while sum(fish_id_diff(found - found_clip_b(1):found - found_clip_b(2))) ~= 191
-                    found_clip_b = found_clip_b + 1; % Slide window
-                    
-                    % Catch Running past the start of the file exception
-                    if found - found_clip_b(1) < 1
-                        found_clip_b = [found_clip_b(1) + 1 found_clip_b(1) + 1];
-                        break
-                    end
+    for e = 1:size(err,1) % for each error 
+         
+        % Use a sliding window to find where the pattern normalises
+        % Cut backwards
+        found = check(err(e,1),1); 
+        found_clip_b = [191 1];
+        if found - found_clip_b(1) < 1
+            found_clip_b = [found + 1 found + 1]; 
+        else
+            while sum(fish_id_diff(found - found_clip_b(1):found - found_clip_b(2))) ~= 191
+                found_clip_b = found_clip_b + 1; % Slide window
+                
+                % Catch Running past the start of the file exception
+                if found - found_clip_b(1) < 1
+                    found_clip_b = [found_clip_b(1) + 1 found_clip_b(1) + 1];
+                    break
                 end
             end
-            
-            fish_id(found - found_clip_b(2)+2:found) = NaN;
         end
         
-    end
+        fish_id(found - found_clip_b(2)+2:found) = NaN;
+    end  
     
-    clear check err fish_id_diff e found found_clip_b
-    
-    % Forwards
-    check(:,1) = find(scrap == -1) + 1;
-    check(:,2) = fish_id(find(scrap == -1)+1);
-    
-    if isempty(find(check(:,2) ~= 1)) == 0 % If there are errors
-        err = find(check(:,2) ~= 1);
-        fish_id_diff = diff(fish_id);
-        
-        for e = 1:size(err,1) % for each error
-            
-            % Cut forwards
-            found = check(err(e,1),1);
-            found_clip_f = [1 191];
-            if found + found_clip_f(2) > length(fish_id_diff)
-                found_clip_f = [length(fish_id_diff) - found + 2 ...
-                    length(fish_id_diff) - found + 2];
-            else
-                while sum(fish_id_diff(found + found_clip_f(1):found + found_clip_f(2))) ~= 191
-                    found_clip_f = found_clip_f + 1; % Slide window
-                    
-                    % Catch Running past the end of the file exception
-                    if found + found_clip_f(2) > length(fish_id_diff)
-                        found_clip_f = [found_clip_f(2)+1 found_clip_f(2)+1];
-                        break
-                    end
+end 
+
+clear check err fish_id_diff e found found_clip_b 
+
+% Forwards 
+check(:,1) = find(scrap == -1); 
+check(:,2) = fish_id(find(scrap == -1)+1); 
+
+if isempty(find(check(:,2) ~= 1)) == 0 % If there are errors
+   err = find(check(:,2) ~= 1); 
+   fish_id_diff = diff(fish_id); 
+       
+   for e = 1:size(err,1) % for each error 
+       
+       % Cut forwards
+        found = check(err(e,1),1); 
+        found_clip_f = [1 191];
+        if found + found_clip_f(2) > length(fish_id_diff)
+            found_clip_f = [length(fish_id_diff) - found + 2 ... 
+                length(fish_id_diff) - found + 2]; 
+        else
+            while sum(fish_id_diff(found + found_clip_f(1):found + found_clip_f(2))) ~= 191
+                found_clip_f = found_clip_f + 1; % Slide window
+                
+                % Catch Running past the end of the file exception
+                if found + found_clip_f(2) > length(fish_id_diff)
+                    found_clip_f = [found_clip_f(2)+1 found_clip_f(2)+1];
+                    break
                 end
             end
-            
-            fish_id(found:found + found_clip_f(1)-1) = NaN;
         end
-        
-    end
-    
-    clear check err fish_id_diff e found found_clip_b
+   end 
+end 
 
-end
+end 
 
-clear scrap 
 %% Reshape The Data 
 
 % Check that the tracking start's with fish 1 

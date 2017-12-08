@@ -192,23 +192,27 @@ clear a e ans data_type data_type_errors f fid folder_open folder_path ...
 % E.g. 171030_16
 
 % Check for remaining Errors
-scrap = diff(isnan(fish_id));
+scrap = diff(isnan(fish_id)); 
+    % This will leave either 
+    % +1 (A number to a NaN) 
+    % -1 (A NaN to a number)  
 
-if size(unique(scrap),1) > 2
+if size(unique(scrap),1) > 2 % If are errors (more numbers) 
     
-    % Backwards
-    check(:,1) = find(scrap == 1);
-    check(:,2) = fish_id(scrap == 1);
+   fish_id_diff = diff(fish_id); % diff fish_id 
+
+    % Check for Backwards errors
+    check(:,1) = find(scrap == 1); % Locs 
+    check(:,2) = fish_id(scrap == 1); % Values (should all be 192)
     
     if isempty(find(check(:,2) ~= 192)) == 0 % If there are errors
-        err = find(check(:,2) ~= 192);
-        fish_id_diff = diff(fish_id);
+        err = find(check(:,2) ~= 192); % define them 
         
         for e = 1:size(err,1) % for each error
             
             % Use a sliding window to find where the pattern normalises
             % Cut backwards
-            found = check(err(e,1),1);
+            found = check(err(e,1),1); % set the error location
             found_clip_b = [191 1];
             if found - found_clip_b(1) < 1
                 found_clip_b = [found + 1 found + 1];
@@ -229,20 +233,19 @@ if size(unique(scrap),1) > 2
         
     end
     
-    clear check err fish_id_diff e found found_clip_b
+    clear check err e found found_clip_b
     
-    % Forwards
+    % Check for forwards errors 
     check(:,1) = find(scrap == -1) + 1;
     check(:,2) = fish_id(find(scrap == -1)+1);
     
     if isempty(find(check(:,2) ~= 1)) == 0 % If there are errors
-        err = find(check(:,2) ~= 1);
-        fish_id_diff = diff(fish_id);
+        err = find(check(:,2) ~= 1); % define them 
         
         for e = 1:size(err,1) % for each error
             
             % Cut forwards
-            found = check(err(e,1),1);
+            found = check(err(e,1),1); % set the error location 
             found_clip_f = [1 191];
             if found + found_clip_f(2) > length(fish_id_diff)
                 found_clip_f = [length(fish_id_diff) - found + 2 ...
@@ -264,11 +267,12 @@ if size(unique(scrap),1) > 2
         
     end
     
-    clear check err fish_id_diff e found found_clip_b
+    clear check err fish_id_diff e found found_clip_f
 
 end
 
 clear scrap 
+
 %% Reshape The Data 
 
 % Check that the tracking start's with fish 1 

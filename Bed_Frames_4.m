@@ -192,86 +192,83 @@ clear a e ans data_type data_type_errors f fid folder_open folder_path ...
 % E.g. 171030_16
 
 % Check for remaining Errors
-scrap = diff(isnan(fish_id)); 
-    % This will leave either 
-    % +1 (A number to a NaN) 
-    % -1 (A NaN to a number)  
+scrap = diff(isnan(fish_id));
+% This will leave either
+% +1 (A number to a NaN)
+% -1 (A NaN to a number)
+% 0 (number to number)
 
-if size(unique(scrap),1) > 2 % If are errors (more numbers) 
-    
-   fish_id_diff = diff(fish_id); % diff fish_id 
+% Check for Backwards errors
+check(:,1) = find(scrap == 1); % Locs
+check(:,2) = fish_id(scrap == 1); % Values (should all be 192)
 
-    % Check for Backwards errors
-    check(:,1) = find(scrap == 1); % Locs 
-    check(:,2) = fish_id(scrap == 1); % Values (should all be 192)
+if isempty(find(check(:,2) ~= 192)) == 0 % If there are errors
+    err = find(check(:,2) ~= 192); % define them
+    fish_id_diff = diff(fish_id); % diff fish_id
     
-    if isempty(find(check(:,2) ~= 192)) == 0 % If there are errors
-        err = find(check(:,2) ~= 192); % define them 
+    for e = 1:size(err,1) % for each error
         
-        for e = 1:size(err,1) % for each error
-            
-            % Use a sliding window to find where the pattern normalises
-            % Cut backwards
-            found = check(err(e,1),1); % set the error location
-            found_clip_b = [191 1];
-            if found - found_clip_b(1) < 1
-                found_clip_b = [found + 1 found + 1];
-            else
-                while sum(fish_id_diff(found - found_clip_b(1):found - found_clip_b(2))) ~= 191
-                    found_clip_b = found_clip_b + 1; % Slide window
-                    
-                    % Catch Running past the start of the file exception
-                    if found - found_clip_b(1) < 1
-                        found_clip_b = [found_clip_b(1) + 1 found_clip_b(1) + 1];
-                        break
-                    end
+        % Use a sliding window to find where the pattern normalises
+        % Cut backwards
+        found = check(err(e,1),1); % set the error location
+        found_clip_b = [191 1];
+        if found - found_clip_b(1) < 1
+            found_clip_b = [found + 1 found + 1];
+        else
+            while sum(fish_id_diff(found - found_clip_b(1):found - found_clip_b(2))) ~= 191
+                found_clip_b = found_clip_b + 1; % Slide window
+                
+                % Catch Running past the start of the file exception
+                if found - found_clip_b(1) < 1
+                    found_clip_b = [found_clip_b(1) + 1 found_clip_b(1) + 1];
+                    break
                 end
             end
-            
-            fish_id(found - found_clip_b(2)+2:found) = NaN;
         end
         
+        fish_id(found - found_clip_b(2)+2:found) = NaN;
     end
     
-    clear check err e found found_clip_b
-    
-    % Check for forwards errors 
-    check(:,1) = find(scrap == -1) + 1;
-    check(:,2) = fish_id(find(scrap == -1)+1);
-    
-    if isempty(find(check(:,2) ~= 1)) == 0 % If there are errors
-        err = find(check(:,2) ~= 1); % define them 
-        
-        for e = 1:size(err,1) % for each error
-            
-            % Cut forwards
-            found = check(err(e,1),1); % set the error location 
-            found_clip_f = [1 191];
-            if found + found_clip_f(2) > length(fish_id_diff)
-                found_clip_f = [length(fish_id_diff) - found + 2 ...
-                    length(fish_id_diff) - found + 2];
-            else
-                while sum(fish_id_diff(found + found_clip_f(1):found + found_clip_f(2))) ~= 191
-                    found_clip_f = found_clip_f + 1; % Slide window
-                    
-                    % Catch Running past the end of the file exception
-                    if found + found_clip_f(2) > length(fish_id_diff)
-                        found_clip_f = [found_clip_f(2)+1 found_clip_f(2)+1];
-                        break
-                    end
-                end
-            end
-            
-            fish_id(found:found + found_clip_f(1)-1) = NaN;
-        end
-        
-    end
-    
-    clear check err fish_id_diff e found found_clip_f
-
 end
 
-clear scrap 
+clear check err e found found_clip_b fish_id_diff
+
+% Check for forwards errors
+check(:,1) = find(scrap == -1) + 1;
+check(:,2) = fish_id(find(scrap == -1)+1);
+
+if isempty(find(check(:,2) ~= 1)) == 0 % If there are errors
+    err = find(check(:,2) ~= 1); % define them
+    fish_id_diff = diff(fish_id); % diff fish_id
+    
+    for e = 1:size(err,1) % for each error
+        
+        % Cut forwards
+        found = check(err(e,1),1); % set the error location
+        found_clip_f = [1 191];
+        if found + found_clip_f(2) > length(fish_id_diff)
+            found_clip_f = [length(fish_id_diff) - found + 2 ...
+                length(fish_id_diff) - found + 2];
+        else
+            while sum(fish_id_diff(found + found_clip_f(1):found + found_clip_f(2))) ~= 191
+                found_clip_f = found_clip_f + 1; % Slide window
+                
+                % Catch Running past the end of the file exception
+                if found + found_clip_f(2) > length(fish_id_diff)
+                    found_clip_f = [found_clip_f(2)+1 found_clip_f(2)+1];
+                    break
+                end
+            end
+        end
+        
+        fish_id(found:found + found_clip_f(1)-1) = NaN;
+    end
+    
+end
+
+clear check err fish_id_diff e found found_clip_f fish_id_diff scrap
+
+disp('Found & Corrected Persistant Ordering Errors'); % Report
 
 %% Reshape The Data 
 
@@ -397,6 +394,8 @@ delta_px_sq = delta_px_sq - 1; % Remove pixel noise
 
 %% Remove "Noise" - set values to zero
 % 1. Abnormally high viewpoint values
+threshold = 200; % Hard coded maximum delta px value 
+
 % 2. Topping up Fish Water
 top_up = [2 4]; % Hard coded - alter to light boundaries where you topped up fish water. 
 % E.g. Day 2 and 3 (top_up = [2 4]). 
@@ -408,6 +407,8 @@ top_up = [2 4]; % Hard coded - alter to light boundaries where you topped up fis
 % Observe is 165px.
 % From a PTZ Dose response (you would expect higher values) the data
 % doesn't exceed this
+% From looking @ 6 Hcrt experiments and the PTZ experiment - data(data > 0)
+% prctile and std, there is no obvious flexible cut off that could be used. 
 
 % 1. Remove High Viewpoint values
 % Note that this is adapted from the parameter extraction code (below)
@@ -447,7 +448,7 @@ for f = 1:size(delta_px_sq,2) % For each fish
         wake_cells{1,f}(b,3) = nanmax(delta_px_sq(wake_cells{1,f}(b,1):...
             wake_cells{1,f}(b,2),f)); % Max
         
-        if wake_cells{1,f}(b,3) > 200 % Hard coded threshold
+        if wake_cells{1,f}(b,3) > threshold % Hard coded threshold
             delta_px_sq(wake_cells{1,f}(b,1):...
                 wake_cells{1,f}(b,2),f) = 0; % Bin to zero
         end
@@ -456,38 +457,56 @@ for f = 1:size(delta_px_sq,2) % For each fish
     
 end
 
-clear b delta_px_sq_scrap f wake_cells
+clear b delta_px_sq_scrap f wake_cells threshold
 
-% 2. Filter out Hands & Truncated Bouts 
-if isempty(top_up) == 0 % if fish h20 was topped up 
-    top_up_bin = nan(size(top_up,2),2,'single'); % pre-allocate (top ups x start/stop) 
+% 2. Filter out Hands & Truncated Bouts - V2 
+figure; plot(nanmax(delta_px_sq')); title('Max'); 
+figure; plot(nanmean(delta_px_sq')); title('Mean'); 
+
+if isempty(top_up) == 0 % if fish h20 was topped up
+    top_up_bin = nan(size(top_up,2),2,'single'); % pre-allocate (top ups x start/stop)
     
     fps = round(1/((nanmean(diff(time_sq_max)))*(60*60)),1); % Calculate frame rate
     
-    for t = 1:size(top_up,2) % For each top up 
-        [~,top_up_bin(t,1)] = find(diff(max(delta_px_sq(lb(top_up(t)):lb(top_up(t)+1),:)')) == ...
-            max(diff(max(delta_px_sq(lb(top_up(t)):lb(top_up(t)+1),:)'))),1,'first'); % find max 
-        top_up_bin(t,1) = lb(top_up(t)) + top_up_bin(t,1) - (fps*15); % go 15s further back 
-        [~,top_up_bin(t,2)] = find(diff(max(delta_px_sq(lb(top_up(t)):lb(top_up(t)+1),:)')) == ...
-            min(diff(max(delta_px_sq(lb(top_up(t)):lb(top_up(t)+1),:)'))),1,'last'); % find end of top up 
-        top_up_bin(t,2) = lb(top_up(t)) + top_up_bin(t,2) + (fps*60); % go 60s further forwards 
+    for t = 1:size(top_up,2) % For each top up
+        [~,top_up_bin(t,1)] = find(abs(diff(max(delta_px_sq(lb(top_up(t)):lb(top_up(t)+1),:)'))) >= ...
+            nanmean(abs(diff(max(delta_px_sq(lb(top_up(t)):lb(top_up(t)+1),:)')))) + ...
+            10*nanstd(abs(diff(max(delta_px_sq(lb(top_up(t)):lb(top_up(t)+1),:)')))),1,'first');
         
-        for f = 1:size(delta_px_sq,2) % for each fish 
-            if delta_px_sq(top_up_bin(t,1),f) == 0 && delta_px_sq(top_up_bin(t,2),f) == 0 
-                delta_px_sq(top_up_bin(t,1):top_up_bin(t,2),f) = 0; % set these values to zero 
-            else % if they have bouts overlapping with these cuts 
+        [~,top_up_bin(t,2)] = find(abs(diff(max(delta_px_sq(lb(top_up(t)):(lb(top_up(t)) + top_up_bin(t,1) + (fps*60*20)),:)'))) >= ...
+            nanmean(abs(diff(max(delta_px_sq(lb(top_up(t)):lb(top_up(t)+1),:)')))) + ...
+            10*nanstd(abs(diff(max(delta_px_sq(lb(top_up(t)):lb(top_up(t)+1),:)')))),1,'last');
+        
+        figure; hold on;
+        plot(abs(diff(max(delta_px_sq(lb(top_up(t)):lb(top_up(t)+1),:)'))));
+        plot([top_up_bin(t,1) top_up_bin(t,1)] - (fps*90),[0 200],'r','linewidth',3);
+        plot([top_up_bin(t,2) top_up_bin(t,2)] + (fps*90),[0 200],'r','linewidth',3);
+        
+        top_up_bin(t,1) = lb(top_up(t)) + top_up_bin(t,1) - (fps*90); % go 90s further back
+        top_up_bin(t,2) = lb(top_up(t)) + top_up_bin(t,2) + (fps*90); % go 90s further forwards
+        
+        for f = 1:size(delta_px_sq,2) % for each fish
+            if delta_px_sq(top_up_bin(t,1),f) == 0 && delta_px_sq(top_up_bin(t,2),f) == 0
+                delta_px_sq(top_up_bin(t,1):top_up_bin(t,2),f) = 0; % set these values to zero
+            else % if they have bouts overlapping with these cuts
                 delta_px_sq(top_up_bin(t,1)- ...
                     (find(flip(delta_px_sq(1:top_up_bin(t,1),f)) == 0,1,'first')-2):...
-                        top_up_bin(t,2) + (find(delta_px_sq(top_up_bin(t,2):end,f) == 0,1,'first')-2),f) = 0; 
-            end 
-        end 
+                    top_up_bin(t,2) + (find(delta_px_sq(top_up_bin(t,2):end,f) == 0,1,'first')-2),f) = 0;
+            end
+        end
+        
+
+        
     end
     
-else % if not topped up 
-    top_up_bin = []; % store a blank variable 
+else % if not topped up
+    top_up_bin = []; % store a blank variable
 end
 
 clear f fps t top_up
+
+figure; plot(nanmax(delta_px_sq')); title('Max - Post '); 
+figure; plot(nanmean(delta_px_sq')); title('Mean - Post '); 
 
 %% Group the data by condition 
 

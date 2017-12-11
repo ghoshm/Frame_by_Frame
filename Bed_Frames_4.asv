@@ -192,86 +192,84 @@ clear a e ans data_type data_type_errors f fid folder_open folder_path ...
 % E.g. 171030_16
 
 % Check for remaining Errors
-scrap = diff(isnan(fish_id)); 
-    % This will leave either 
-    % +1 (A number to a NaN) 
-    % -1 (A NaN to a number)  
+scrap = diff(isnan(fish_id));
+% This will leave either
+% +1 (A number to a NaN)
+% -1 (A NaN to a number)
+% 0 (number to number)
 
-if size(unique(scrap),1) > 2 % If are errors (
+% Check for Backwards errors
+check(:,1) = find(scrap == 1); % Locs
+check(:,2) = fish_id(scrap == 1); % Values (should all be 192)
+
+if isempty(find(check(:,2) ~= 192)) == 0 % If there are errors
+    err = find(check(:,2) ~= 192); % define them
+    fish_id_diff = diff(fish_id); % diff fish_id
     
-    % Backwards
-    check(:,1) = find(scrap == 1);
-    check(:,2) = fish_id(scrap == 1);
-    
-    if isempty(find(check(:,2) ~= 192)) == 0 % If there are errors
-        err = find(check(:,2) ~= 192);
-        fish_id_diff = diff(fish_id);
+    for e = 1:size(err,1) % for each error
         
-        for e = 1:size(err,1) % for each error
-            
-            % Use a sliding window to find where the pattern normalises
-            % Cut backwards
-            found = check(err(e,1),1);
-            found_clip_b = [191 1];
-            if found - found_clip_b(1) < 1
-                found_clip_b = [found + 1 found + 1];
-            else
-                while sum(fish_id_diff(found - found_clip_b(1):found - found_clip_b(2))) ~= 191
-                    found_clip_b = found_clip_b + 1; % Slide window
-                    
-                    % Catch Running past the start of the file exception
-                    if found - found_clip_b(1) < 1
-                        found_clip_b = [found_clip_b(1) + 1 found_clip_b(1) + 1];
-                        break
-                    end
+        % Use a sliding window to find where the pattern normalises
+        % Cut backwards
+        found = check(err(e,1),1); % set the error location
+        found_clip_b = [191 1];
+        if found - found_clip_b(1) < 1
+            found_clip_b = [found + 1 found + 1];
+        else
+            while sum(fish_id_diff(found - found_clip_b(1):found - found_clip_b(2))) ~= 191
+                found_clip_b = found_clip_b + 1; % Slide window
+                
+                % Catch Running past the start of the file exception
+                if found - found_clip_b(1) < 1
+                    found_clip_b = [found_clip_b(1) + 1 found_clip_b(1) + 1];
+                    break
                 end
             end
-            
-            fish_id(found - found_clip_b(2)+2:found) = NaN;
         end
         
+        fish_id(found - found_clip_b(2)+2:found) = NaN;
     end
     
-    clear check err fish_id_diff e found found_clip_b
-    
-    % Forwards
-    check(:,1) = find(scrap == -1) + 1;
-    check(:,2) = fish_id(find(scrap == -1)+1);
-    
-    if isempty(find(check(:,2) ~= 1)) == 0 % If there are errors
-        err = find(check(:,2) ~= 1);
-        fish_id_diff = diff(fish_id);
-        
-        for e = 1:size(err,1) % for each error
-            
-            % Cut forwards
-            found = check(err(e,1),1);
-            found_clip_f = [1 191];
-            if found + found_clip_f(2) > length(fish_id_diff)
-                found_clip_f = [length(fish_id_diff) - found + 2 ...
-                    length(fish_id_diff) - found + 2];
-            else
-                while sum(fish_id_diff(found + found_clip_f(1):found + found_clip_f(2))) ~= 191
-                    found_clip_f = found_clip_f + 1; % Slide window
-                    
-                    % Catch Running past the end of the file exception
-                    if found + found_clip_f(2) > length(fish_id_diff)
-                        found_clip_f = [found_clip_f(2)+1 found_clip_f(2)+1];
-                        break
-                    end
-                end
-            end
-            
-            fish_id(found:found + found_clip_f(1)-1) = NaN;
-        end
-        
-    end
-    
-    clear check err fish_id_diff e found found_clip_b
-
 end
 
-clear scrap 
+clear check err e found found_clip_b fish_id_diff
+
+% Check for forwards errors
+check(:,1) = find(scrap == -1) + 1;
+check(:,2) = fish_id(find(scrap == -1)+1);
+
+if isempty(find(check(:,2) ~= 1)) == 0 % If there are errors
+    err = find(check(:,2) ~= 1); % define them
+    fish_id_diff = diff(fish_id); % diff fish_id
+    
+    for e = 1:size(err,1) % for each error
+        
+        % Cut forwards
+        found = check(err(e,1),1); % set the error location
+        found_clip_f = [1 191];
+        if found + found_clip_f(2) > length(fish_id_diff)
+            found_clip_f = [length(fish_id_diff) - found + 2 ...
+                length(fish_id_diff) - found + 2];
+        else
+            while sum(fish_id_diff(found + found_clip_f(1):found + found_clip_f(2))) ~= 191
+                found_clip_f = found_clip_f + 1; % Slide window
+                
+                % Catch Running past the end of the file exception
+                if found + found_clip_f(2) > length(fish_id_diff)
+                    found_clip_f = [found_clip_f(2)+1 found_clip_f(2)+1];
+                    break
+                end
+            end
+        end
+        
+        fish_id(found:found + found_clip_f(1)-1) = NaN;
+    end
+    
+end
+
+clear check err fish_id_diff e found found_clip_f fish_id_diff scrap
+
+disp('Found & Corrected Persistant Ordering Errors'); % Report
+
 %% Reshape The Data 
 
 % Check that the tracking start's with fish 1 
@@ -385,8 +383,8 @@ clear a boundary start_time time_counter time time_sq t
 %     prctile(scrap(:)',[0 10 20 30 40 50 60 70 80 90])
 %     prctile(scrap(:)',[0 10 20 30 40 50 60 70 80 90])
 
-%delta_px_sq(:,1:96) = []; % Remove the unused box 
-delta_px_sq(:,97:end) = []; % Remove the unused box 
+delta_px_sq(:,1:96) = []; % Remove the unused box 
+%delta_px_sq(:,97:end) = []; % Remove the unused box 
 delta_px_sq = delta_px_sq - 1; % Remove pixel noise 
 
 % Now normalise for each fish 
@@ -400,6 +398,7 @@ delta_px_sq = delta_px_sq - 1; % Remove pixel noise
 top_up = [2 4]; % Hard coded - alter to light boundaries where you topped up fish water. 
 % E.g. Day 2 and 3 (top_up = [2 4]). 
 % E.g. Not topped up (top_up = []). 
+threshold = 200; % Hard coded maximum delta px value 
 
 % A hard threshold is a simple solution, though removing whole bouts
 % including these values is best as it avoids leaving "cut bouts" 
@@ -407,6 +406,8 @@ top_up = [2 4]; % Hard coded - alter to light boundaries where you topped up fis
 % Observe is 165px.
 % From a PTZ Dose response (you would expect higher values) the data
 % doesn't exceed this
+% From looking @ 6 Hcrt experiments and the PTZ experiment - data(data > 0)
+% prctile and std, there is no obvious cut off that could be used. 
 
 % 1. Remove High Viewpoint values
 % Note that this is adapted from the parameter extraction code (below)
@@ -446,7 +447,7 @@ for f = 1:size(delta_px_sq,2) % For each fish
         wake_cells{1,f}(b,3) = nanmax(delta_px_sq(wake_cells{1,f}(b,1):...
             wake_cells{1,f}(b,2),f)); % Max
         
-        if wake_cells{1,f}(b,3) > 200 % Hard coded threshold
+        if wake_cells{1,f}(b,3) > threshold % Hard coded threshold
             delta_px_sq(wake_cells{1,f}(b,1):...
                 wake_cells{1,f}(b,2),f) = 0; % Bin to zero
         end
@@ -486,7 +487,7 @@ else % if not topped up
     top_up_bin = []; % store a blank variable 
 end
 
-clear f fps t top_up
+clear f fps t top_up 
 
 %% Group the data by condition 
 

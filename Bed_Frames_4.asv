@@ -384,7 +384,7 @@ clear a boundary start_time time_counter time time_sq t
 %     prctile(scrap(:)',[0 10 20 30 40 50 60 70 80 90])
 
 delta_px_sq(:,1:96) = []; % Remove the unused box 
-%delta_px_sq(:,97:end) = []; % Remove the unused box 
+delta_px_sq(:,97:end) = []; % Remove the unused box 
 delta_px_sq = delta_px_sq - 1; % Remove pixel noise 
 
 % Now normalise for each fish 
@@ -394,11 +394,12 @@ delta_px_sq = delta_px_sq - 1; % Remove pixel noise
 
 %% Remove "Noise" - set values to zero
 % 1. Abnormally high viewpoint values
+threshold = 200; % Hard coded maximum delta px value 
+
 % 2. Topping up Fish Water
 top_up = [2 4]; % Hard coded - alter to light boundaries where you topped up fish water. 
 % E.g. Day 2 and 3 (top_up = [2 4]). 
 % E.g. Not topped up (top_up = []). 
-threshold = 200; % Hard coded maximum delta px value 
 
 % A hard threshold is a simple solution, though removing whole bouts
 % including these values is best as it avoids leaving "cut bouts" 
@@ -407,7 +408,7 @@ threshold = 200; % Hard coded maximum delta px value
 % From a PTZ Dose response (you would expect higher values) the data
 % doesn't exceed this
 % From looking @ 6 Hcrt experiments and the PTZ experiment - data(data > 0)
-% prctile and std, there is no obvious cut off that could be used. 
+% prctile and std, there is no obvious flexible cut off that could be used. 
 
 % 1. Remove High Viewpoint values
 % Note that this is adapted from the parameter extraction code (below)
@@ -456,38 +457,59 @@ for f = 1:size(delta_px_sq,2) % For each fish
     
 end
 
-clear b delta_px_sq_scrap f wake_cells
+clear b delta_px_sq_scrap f wake_cells threshold
 
-% 2. Filter out Hands & Truncated Bouts 
-if isempty(top_up) == 0 % if fish h20 was topped up 
-    top_up_bin = nan(size(top_up,2),2,'single'); % pre-allocate (top ups x start/stop) 
+% 2. Filter out Hands & Truncated Bouts - V2 
+figure; plot(nanmax(delta_px_sq')); title('Max'); 
+figure; plot(nanmean(delta_px_sq')); title('Mean'); 
+
+if isempty(top_up) == 0 % if fish h20 was topped up
+    top_up_bin = nan(size(top_up,2),2,'single'); % pre-allocate (top ups x start/stop)
     
     fps = round(1/((nanmean(diff(time_sq_max)))*(60*60)),1); % Calculate frame rate
     
-    for t = 1:size(top_up,2) % For each top up 
-        [~,top_up_bin(t,1)] = find(diff(max(delta_px_sq(lb(top_up(t)):lb(top_up(t)+1),:)')) == ...
-            max(diff(max(delta_px_sq(lb(top_up(t)):lb(top_up(t)+1),:)'))),1,'first'); % find max 
-        top_up_bin(t,1) = lb(top_up(t)) + top_up_bin(t,1) - (fps*15); % go 15s further back 
-        [~,top_up_bin(t,2)] = find(diff(max(delta_px_sq(lb(top_up(t)):lb(top_up(t)+1),:)')) == ...
-            min(diff(max(delta_px_sq(lb(top_up(t)):lb(top_up(t)+1),:)'))),1,'last'); % find end of top up 
-        top_up_bin(t,2) = lb(top_up(t)) + top_up_bin(t,2) + (fps*60); % go 60s further forwards 
+    for t = 1:size(top_up,2) % For each top up
+        [~,top_up_bin(t,1)] = find(abs(diff(max(delta_px_sq(lb(top_up(t)):lb(top_up(t)+1),:)'))) >= ...
+            nanmean(abs(diff(max(delta_px_sq(lb(top_up(t)):lb(top_up(t)+1),:)')))) + ...
+            10*nanstd(abs(diff(max(delta_px_sq(lb(top_up(t)):lb(top_up(t)+1),:)')))),1,'first'); % find start 
         
-        for f = 1:size(delta_px_sq,2) % for each fish 
-            if delta_px_sq(top_up_bin(t,1),f) == 0 && delta_px_sq(top_up_bin(t,2),f) == 0 
-                delta_px_sq(top_up_bin(t,1):top_up_bin(t,2),f) = 0; % set these values to zero 
-            else % if they have bouts overlapping with these cuts 
+        [~,top_up_bin(t,2)] = find(abs(diff(max(delta_px_sq(lb(top_up(t)):(lb(top_up(t)) + top_up_bin(t,1) + (fps*60*20)),:)'))) >= ...
+            nanmean(abs(diff(max(delta_px_sq(lb(top_up(t)):lb(top_up(t)+1),:)')))) + ...
+            10*nanstd(abs(diff(max(delta_px_sq(lb(top_up(t)):lb(top_up(t)+1),:)')))),1,'last'); % find stop 
+        % Note that here I only look within 20mins (this helps avoid
+        % reminaing viewpoint glitches "(fps*60*20)") 
+        
+        figure; hold on;
+        plot(abs(diff(max(delta_px_sq(lb(top_up(t)):lb(top_up(t)+1),:)'))));
+        plot([top_up_bin(t,1) top_up_bin(t,1)] - (fps*90),[0 200],'r','linewidth',3);
+        plot([top_up_bin(t,2) top_up_bin(t,2)] + (fps*90),[0 200],'r','linewidth',3);
+        
+        % To ensure you get all of the noise, cut a bit more either side 
+        top_up_bin(t,1) = lb(top_up(t)) + top_up_bin(t,1) - (fps*90); % go 90s further back
+        top_up_bin(t,2) = lb(top_up(t)) + top_up_bin(t,2) + (fps*90); % go 90s further forwards
+        
+        for f = 1:size(delta_px_sq,2) % for each fish
+            if delta_px_sq(top_up_bin(t,1),f) == 0 && delta_px_sq(top_up_bin(t,2),f) == 0
+                delta_px_sq(top_up_bin(t,1):top_up_bin(t,2),f) = 0; % set these values to zero
+            else % if they have bouts overlapping with these cuts
                 delta_px_sq(top_up_bin(t,1)- ...
                     (find(flip(delta_px_sq(1:top_up_bin(t,1),f)) == 0,1,'first')-2):...
-                        top_up_bin(t,2) + (find(delta_px_sq(top_up_bin(t,2):end,f) == 0,1,'first')-2),f) = 0; 
-            end 
-        end 
+                    top_up_bin(t,2) + (find(delta_px_sq(top_up_bin(t,2):end,f) == 0,1,'first')-2),f) = 0;
+            end
+        end
+        
+
+        
     end
     
-else % if not topped up 
-    top_up_bin = []; % store a blank variable 
+else % if not topped up
+    top_up_bin = []; % store a blank variable
 end
 
-clear f fps t top_up 
+clear f fps t top_up
+
+figure; plot(nanmax(delta_px_sq')); title('Max - Post '); 
+figure; plot(nanmean(delta_px_sq')); title('Mean - Post '); 
 
 %% Group the data by condition 
 

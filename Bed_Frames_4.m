@@ -460,8 +460,8 @@ end
 clear b delta_px_sq_scrap f wake_cells threshold
 
 % 2. Filter out Hands & Truncated Bouts - V2 
-figure; plot(nanmax(delta_px_sq')); title('Max'); 
-figure; plot(nanmean(delta_px_sq')); title('Mean'); 
+%figure; plot(nanmax(delta_px_sq')); title('Max'); 
+%figure; plot(nanmean(delta_px_sq')); title('Mean'); 
 
 if isempty(top_up) == 0 % if fish h20 was topped up
     top_up_bin = nan(size(top_up,2),2,'single'); % pre-allocate (top ups x start/stop)
@@ -471,17 +471,20 @@ if isempty(top_up) == 0 % if fish h20 was topped up
     for t = 1:size(top_up,2) % For each top up
         [~,top_up_bin(t,1)] = find(abs(diff(max(delta_px_sq(lb(top_up(t)):lb(top_up(t)+1),:)'))) >= ...
             nanmean(abs(diff(max(delta_px_sq(lb(top_up(t)):lb(top_up(t)+1),:)')))) + ...
-            10*nanstd(abs(diff(max(delta_px_sq(lb(top_up(t)):lb(top_up(t)+1),:)')))),1,'first');
+            10*nanstd(abs(diff(max(delta_px_sq(lb(top_up(t)):lb(top_up(t)+1),:)')))),1,'first'); % find start 
         
         [~,top_up_bin(t,2)] = find(abs(diff(max(delta_px_sq(lb(top_up(t)):(lb(top_up(t)) + top_up_bin(t,1) + (fps*60*20)),:)'))) >= ...
             nanmean(abs(diff(max(delta_px_sq(lb(top_up(t)):lb(top_up(t)+1),:)')))) + ...
-            10*nanstd(abs(diff(max(delta_px_sq(lb(top_up(t)):lb(top_up(t)+1),:)')))),1,'last');
+            10*nanstd(abs(diff(max(delta_px_sq(lb(top_up(t)):lb(top_up(t)+1),:)')))),1,'last'); % find stop 
+        % Note that here I only look within 20mins (this helps avoid
+        % reminaing viewpoint glitches "(fps*60*20)") 
         
-        figure; hold on;
-        plot(abs(diff(max(delta_px_sq(lb(top_up(t)):lb(top_up(t)+1),:)'))));
-        plot([top_up_bin(t,1) top_up_bin(t,1)] - (fps*90),[0 200],'r','linewidth',3);
-        plot([top_up_bin(t,2) top_up_bin(t,2)] + (fps*90),[0 200],'r','linewidth',3);
+        %figure; hold on;
+        %plot(abs(diff(max(delta_px_sq(lb(top_up(t)):lb(top_up(t)+1),:)'))));
+        %plot([top_up_bin(t,1) top_up_bin(t,1)] - (fps*90),[0 200],'r','linewidth',3);
+        %plot([top_up_bin(t,2) top_up_bin(t,2)] + (fps*90),[0 200],'r','linewidth',3);
         
+        % To ensure you get all of the noise, cut a bit more either side 
         top_up_bin(t,1) = lb(top_up(t)) + top_up_bin(t,1) - (fps*90); % go 90s further back
         top_up_bin(t,2) = lb(top_up(t)) + top_up_bin(t,2) + (fps*90); % go 90s further forwards
         
@@ -505,8 +508,8 @@ end
 
 clear f fps t top_up
 
-figure; plot(nanmax(delta_px_sq')); title('Max - Post '); 
-figure; plot(nanmean(delta_px_sq')); title('Mean - Post '); 
+%figure; plot(nanmax(delta_px_sq')); title('Max - Post '); 
+%figure; plot(nanmean(delta_px_sq')); title('Mean - Post '); 
 
 %% Group the data by condition 
 

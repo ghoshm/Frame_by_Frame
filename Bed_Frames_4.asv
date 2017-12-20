@@ -384,7 +384,7 @@ clear a boundary start_time time_counter time time_sq t
 %     prctile(scrap(:)',[0 10 20 30 40 50 60 70 80 90])
 
 delta_px_sq(:,1:96) = []; % Remove the unused box 
-delta_px_sq(:,97:end) = []; % Remove the unused box 
+%delta_px_sq(:,97:end) = []; % Remove the unused box 
 delta_px_sq = delta_px_sq - 1; % Remove pixel noise 
 
 % Now normalise for each fish 
@@ -397,7 +397,7 @@ delta_px_sq = delta_px_sq - 1; % Remove pixel noise
 threshold = 200; % Hard coded maximum delta px value 
 
 % 2. Topping up Fish Water
-top_up = [2 4]; % Hard coded - alter to light boundaries where you topped up fish water. 
+top_up = []; % Hard coded - alter to light boundaries where you topped up fish water. 
 % E.g. Day 2 and 3 (top_up = [2 4]). 
 % E.g. Not topped up (top_up = []). 
 
@@ -460,8 +460,8 @@ end
 clear b delta_px_sq_scrap f wake_cells threshold
 
 % 2. Filter out Hands & Truncated Bouts - V2 
-figure; plot(nanmax(delta_px_sq')); title('Max'); 
-figure; plot(nanmean(delta_px_sq')); title('Mean'); 
+%figure; plot(nanmax(delta_px_sq')); title('Max'); 
+%figure; plot(nanmean(delta_px_sq')); title('Mean'); 
 
 if isempty(top_up) == 0 % if fish h20 was topped up
     top_up_bin = nan(size(top_up,2),2,'single'); % pre-allocate (top ups x start/stop)
@@ -479,10 +479,10 @@ if isempty(top_up) == 0 % if fish h20 was topped up
         % Note that here I only look within 20mins (this helps avoid
         % reminaing viewpoint glitches "(fps*60*20)") 
         
-        figure; hold on;
-        plot(abs(diff(max(delta_px_sq(lb(top_up(t)):lb(top_up(t)+1),:)'))));
-        plot([top_up_bin(t,1) top_up_bin(t,1)] - (fps*90),[0 200],'r','linewidth',3);
-        plot([top_up_bin(t,2) top_up_bin(t,2)] + (fps*90),[0 200],'r','linewidth',3);
+        %figure; hold on;
+        %plot(abs(diff(max(delta_px_sq(lb(top_up(t)):lb(top_up(t)+1),:)'))));
+        %plot([top_up_bin(t,1) top_up_bin(t,1)] - (fps*90),[0 200],'r','linewidth',3);
+        %plot([top_up_bin(t,2) top_up_bin(t,2)] + (fps*90),[0 200],'r','linewidth',3);
         
         % To ensure you get all of the noise, cut a bit more either side 
         top_up_bin(t,1) = lb(top_up(t)) + top_up_bin(t,1) - (fps*90); % go 90s further back
@@ -508,8 +508,8 @@ end
 
 clear f fps t top_up
 
-figure; plot(nanmax(delta_px_sq')); title('Max - Post '); 
-figure; plot(nanmean(delta_px_sq')); title('Mean - Post '); 
+%figure; plot(nanmax(delta_px_sq')); title('Max - Post '); 
+%figure; plot(nanmean(delta_px_sq')); title('Mean - Post '); 
 
 %% Group the data by condition 
 
@@ -973,30 +973,34 @@ end
 delta_px_sq_sec_smooth = delta_px_sq_sec_smooth{end,1}; % Keep merged data 
 
 % Normalise for time (% of time active)
-lb_frames_diff = diff(lb_frames);
-counter = 1; top_up_counter = 1; % start counters 
+lb_frames_diff = diff(lb_frames); % diff to get frames per window
+top_up_counter = 1; % start counter
+
 for g = 1:max(group_tags) % for each group
-    for f = 1:size(find(group_tags == g),1) % for each fish
+    
+    clear list; counter = 1; 
+    list = find(isnan(parameter_comparisons{1,8}(:,g,1))==0); % find values 
+
+    for f = find(group_tags == g)' % for each fish in this group 
         for t = 1:size(parameter_comparisons{1,8},3) % for each time window
-            if sum(isnan(sleep_cells{1,f}(parameter_indicies{2,f} == t,3))) == 0 % if there are no NaN Values 
-                parameter_comparisons{1,8}(f,g,t) = ...
-                    (parameter_comparisons{1,8}(f,g,t)/...
-                    lb_frames_diff(t,experiment_tags(counter)))*100;
-            else % If there are NaN values (water topped up) 
-                    % Subtract the time taken to top the water up 
-                parameter_comparisons{1,8}(f,g,t) = ...
-                    (parameter_comparisons{1,8}(f,g,t)/...
-                    (lb_frames_diff(t,experiment_tags(counter)) - ...
-                    diff(top_up_bin{1,experiment_tags(counter)}(top_up_counter,:))))*100;
-                top_up_counter = top_up_counter + 1; % add to counter 
+            if sum(isnan(sleep_cells{1,f}(parameter_indicies{2,f} == t,3))) == 0 % if there are no NaN Values
+                parameter_comparisons{1,8}(list(counter),g,t) = ...
+                    (parameter_comparisons{1,8}(list(counter),g,t)/...
+                    lb_frames_diff(t,experiment_tags(f)))*100;
+            else % If there are NaN values (water topped up)
+                % Subtract the time taken to top the water up
+                parameter_comparisons{1,8}(list(counter),g,t) = ...
+                    (parameter_comparisons{1,8}(list(counter),g,t)/...
+                    (lb_frames_diff(t,experiment_tags(f)) - ...
+                    diff(top_up_bin{1,experiment_tags(f)}(top_up_counter,:))))*100;
+                top_up_counter = top_up_counter + 1; % add to counter
             end
-            
         end
         counter = counter + 1; % add to counter
-        top_up_counter = 1; % re-set counter 
+        top_up_counter = 1; % re-set counter
     end
 end
-clear counter top_up_counter;
+clear g f t counter top_up_counter list 
 
 unit_conversion(1,8) = 1; units{8} = '% of Time'; % swap hours to % 
 unit_conversion(1,12) = 1; units{12} = '% of Time'; % swap hours to % 
@@ -1126,7 +1130,7 @@ for p = find(parameter_smooth == 0) % For most parameters
 end
  toc 
  
-clear a counter f p pd t time_start time_stop
+clear a counter f p pd t time_start time_stop dist_boundaries
 
 %% Figure - Parameter Means 
 
@@ -1139,12 +1143,17 @@ for p = 1:size(parameter_comparisons,2) - 2 % For each parameter
     % Plot parameters
     for e = 1:max(experiment_tags) % For each experiment 
         for g = 1:max(group_tags) % For each group
-            legend_lines(g) = errorbar((nanmean(squeeze(parameter_comparisons{p}...
-                (experiment_tags(group_tags == g) == e,g,time_window(1):time_window(2))),1)/unit_conversion(1,p)),...
-                (nanstd(squeeze(parameter_comparisons{p}(experiment_tags(group_tags == g) == e,g,time_window(1):time_window(2))))...
-                /unit_conversion(1,p))./sqrt(size(find(experiment_tags == e & group_tags == g),1)),...
+            clear data; 
+            data = parameter_comparisons{p}(:,g,time_window(1):time_window(2)); % extract data 
+            data(isnan(data)) = []; % remove nan values 
+            data = reshape(data,[group_sizes(g),size(time_window(1):time_window(2),2)]); % reshape to matrix 
+            data = data/unit_conversion(1,p); % convert to appropriate units   
+            
+            legend_lines(g) = errorbar(nanmean(data(experiment_tags(group_tags == g) == e,:)),...
+                nanstd(data(experiment_tags(group_tags == g) == e,:))./...
+                sqrt(size(find(experiment_tags == e & group_tags == g),1)),...
                 'color',cmap(g,:)+(1-cmap(g,:))*(1-(1/e^.5)),'linewidth',3);
-
+    
             if e == 1 % For the first experiment 
             legend_cell{g} = horzcat(geno_list.colheaders{g},', n = ',...
                 num2str(size(find(group_tags == g),1)));
@@ -1154,14 +1163,12 @@ for p = 1:size(parameter_comparisons,2) - 2 % For each parameter
             % To accurately determine axis scale
             % Add and subtract the std from each mean then determine
             % The highest & lowest value for each group
-            scrap(1,counter) = max(nanmean(squeeze(parameter_comparisons{p}...
-                (experiment_tags(group_tags == g) == e,g,time_window(1):time_window(2))),1)/unit_conversion(1,p) + ...
-                (nanstd(squeeze(parameter_comparisons{p}(experiment_tags(group_tags == g) == e,g,time_window(1):time_window(2))))...
-                /unit_conversion(1,p))./sqrt(size(find(experiment_tags == e & group_tags == g),1))); 
-            scrap(2,counter) = min(nanmean(squeeze(parameter_comparisons{p}...
-                (experiment_tags(group_tags == g) == e,g,time_window(1):time_window(2))),1)/unit_conversion(1,p) - ...
-                (nanstd(squeeze(parameter_comparisons{p}(experiment_tags(group_tags == g) == e,g,time_window(1):time_window(2))))...
-                /unit_conversion(1,p))./sqrt(size(find(experiment_tags == e & group_tags == g),1)));
+            scrap(1,counter) = max(nanmean(data(experiment_tags(group_tags == g) == e,:))...
+                + nanstd(data(experiment_tags(group_tags == g) == e,:))./...
+                sqrt(size(find(experiment_tags == e & group_tags == g),1)));
+            scrap(2,counter) = min(nanmean(data(experiment_tags(group_tags == g) == e,:))...
+                - nanstd(data(experiment_tags(group_tags == g) == e,:))./...
+                sqrt(size(find(experiment_tags == e & group_tags == g),1)));
             
             counter = counter + 1; % Add to counter 
         end
@@ -1194,7 +1201,7 @@ for p = 1:size(parameter_comparisons,2) - 2 % For each parameter
 
 end
   
-clear p scrap g legend_lines y_lims a n r night_start count
+clear data p scrap g legend_lines y_lims a n r night_start count
 
 %% Figure - Parameters Across Time  
 
@@ -1263,7 +1270,7 @@ for e = 1:max(experiment_tags) % For each experiment
             (lb_sec(time_window(2)+1)-1),nanmean(delta_px_sq_sec_smooth...
             (lb_sec(time_window(1)):(lb_sec(time_window(2)+1)-1),group_tags == g & experiment_tags == e),2),...
             nanstd(delta_px_sq_sec_smooth(lb_sec(time_window(1)):(lb_sec(time_window(2)+1)-1),...
-            group_tags == g & experiment_tags == e)')/sqrt(size(find(group_tags == 1 & experiment_tags == 1),1)),...
+            group_tags == g & experiment_tags == e)')/sqrt(size(find(group_tags == g & experiment_tags == e),1)),...
             'lineprops',{'color',cmap(g,:)+(1-cmap(g,:))*(1-(1/e^.5))});
         
         legend_cols(g) = legend_lines(g).mainLine; % Store color
@@ -1299,264 +1306,312 @@ ylabel('Delta Px','Fontsize',32);
 clear a g h icons plots str legend_cell legend_cols legend_lines n r x y_lims 
 
 %% Figure - Parameter Distributions V3
-    % Uses a log axis for plots 
-    % Plot's Std Rather than SEM 
-        % Note I've left the SEM Code in as this will probably be better
-        % for more groups 
-    
-figure; 
+% Uses a log axis for plots
+% Plot's Std Rather than SEM
+% Note I've left the SEM Code (commented out) in as this will probably be better
+% for more groups
+
+figure;
 for p = 1:size(parameters,2) - 2 % For each parameter
-    subplot(2,5,p); hold on; col = 1; counter = 1; 
+    subplot(2,5,p); hold on; col = 1; counter = 1;
     clear data legend_lines legend_cols legend_cell r sample crop y_lims spread_cols;
-    box off; set(gca, 'Layer','top'); set(gca,'Fontsize',12); set(gca,'FontName','Calibri'); % Set Font  
+    box off; set(gca, 'Layer','top'); set(gca,'Fontsize',12); set(gca,'FontName','Calibri'); % Set Font
     title(parameters{p}); % Add title
     
-    if ismember(p,[7:9 11:12]) == 0 % For most parameters 
+    if ismember(p,[7:9 11:12]) == 0 % For most parameters
         
-        % Take day & night distributions across time windows  
+        % Take day & night distributions across time windows
         data{1,1} = reshape(permute(parameter_dists{p}(:,:,days_crop(days)),[1 3 2]),...
             [],size(parameter_dists{p}(:,:,days_crop(days)),2));
         data{1,2} = reshape(permute(parameter_dists{p}(:,:,nights_crop(nights)),[1 3 2]),...
             [],size(parameter_dists{p}(:,:,nights_crop(nights)),2));
         
-        % Expand group tags to account for multiple days/nights 
+        % Expand group tags to account for multiple days/nights
         data{2,1} = repmat(group_tags,[size(data{1,1},1)/size(group_tags,1),1]);
         data{2,2} = repmat(group_tags,[size(data{1,2},1)/size(group_tags,1),1]);
         
-        % Expand experiment tags to account for multiple days/nights 
+        % Expand experiment tags to account for multiple days/nights
         data{3,1} = repmat(experiment_tags,[size(data{1,1},1)/size(experiment_tags,1),1]);
         data{3,2} = repmat(experiment_tags,[size(data{1,2},1)/size(experiment_tags,1),1]);
         
         % V2
-        % Find a cut off for each figure 
-            % This helps with visualisation & prevents the generation of 
-                % large patch objects which often crash Matlab 
-            %crop = find(nanmean([data{1,1} ; data{1,2}]) < 0.01,1,'first');
+        % Find a cut off for each figure
+        % This helps with visualisation & prevents the generation of
+        % large patch objects which often crash Matlab
+        %crop = find(nanmean([data{1,1} ; data{1,2}]) < 0.01,1,'first');
         
-       % V3 
-       crop = size(data{1,1},2); % crop = all data
-       
-       for e = 1:max(experiment_tags) % For each experimet 
-           col = 1;  
-        for g = 1:max(group_tags) % For each group
-            for t = 1:2 % For day/night
-                  % SEM 
-%                 if t == 1 % for day 
-%                     sample = size(find(data{2,t} == g & data{3,t} == e),1)/...
-%                         size(days,2);
-%                 else % for night
-%                     sample = size(find(data{2,t} == g & data{3,t} == e),1)/...
-%                         size(nights,2);
-%                 end
-%                     Find the number of fish
-                
-                legend_lines(col) = shadedErrorBar((1:crop)/unit_conversion(1,p),...
-                    nanmean(data{1,t}(data{2,t} == g & data{3,t} == e,1:crop)),...
-                    nanstd(data{1,t}(data{2,t} == g & data{3,t} == e,1:crop))...%/sqrt(sample)
-                    ,'lineprops',{'color',cmap_2(col,:)+(1-cmap_2(col,:))*(1-(1/e^.5))}); 
-                % Plot - note that this is now in appropriate units
-                    % (eg.seconds) 
-                
-                legend_cols(col) = legend_lines(col).mainLine; % Save color
-
-                % Append time window to group names 
-                if e == 1 % For the first experiment 
-                    if first_night == 2 % If starting in the day
-                        if t == 1 % For the days
-                            legend_cell{col} = horzcat(geno_list.colheaders{g},' - Day'); % Tag
-                        else % For the nights
-                            legend_cell{col} = horzcat(geno_list.colheaders{g},' - Night'); % Tag
-                        end
-                    else % If starting in the night
-                        if t == 1 % For the nights
-                            legend_cell{col} = horzcat(geno_list.colheaders{g},' - Night'); % Tag
-                        else % For the days
-                            legend_cell{col} = horzcat(geno_list.colheaders{g},' - Day'); % Tag
+        % V3
+        crop = size(data{1,1},2); % crop = all data
+        
+        for e = 1:max(experiment_tags) % For each experimet
+            col = 1;
+            for g = 1:max(group_tags) % For each group
+                for t = 1:2 % For day/night
+                    % SEM
+                    %                 if t == 1 % for day
+                    %                     sample = size(find(data{2,t} == g & data{3,t} == e),1)/...
+                    %                         size(days,2);
+                    %                 else % for night
+                    %                     sample = size(find(data{2,t} == g & data{3,t} == e),1)/...
+                    %                         size(nights,2);
+                    %                 end
+                    %                     Find the number of fish
+                    
+                    legend_lines(col) = shadedErrorBar((1:crop)/unit_conversion(1,p),...
+                        nanmean(data{1,t}(data{2,t} == g & data{3,t} == e,1:crop)),...
+                        nanstd(data{1,t}(data{2,t} == g & data{3,t} == e,1:crop))...%/sqrt(sample)
+                        ,'lineprops',{'color',cmap_2(col,:)+(1-cmap_2(col,:))*(1-(1/e^.5))});
+                    % Plot - note that this is now in appropriate units
+                    % (eg.seconds)
+                    
+                    legend_cols(col) = legend_lines(col).mainLine; % Save color
+                    
+                    % Append time window to group names
+                    if e == 1 % For the first experiment
+                        if first_night == 2 % If starting in the day
+                            if t == 1 % For the days
+                                legend_cell{col} = horzcat(geno_list.colheaders{g},' - Day'); % Tag
+                            else % For the nights
+                                legend_cell{col} = horzcat(geno_list.colheaders{g},' - Night'); % Tag
+                            end
+                        else % If starting in the night
+                            if t == 1 % For the nights
+                                legend_cell{col} = horzcat(geno_list.colheaders{g},' - Night'); % Tag
+                            else % For the days
+                                legend_cell{col} = horzcat(geno_list.colheaders{g},' - Day'); % Tag
+                            end
                         end
                     end
+                    % Determine Axis boundaries
+                    y_lims(1,counter) = max(legend_lines(col).mainLine.YData);
+                    y_lims(2,counter) = min(legend_lines(col).mainLine.YData);
+                    
+                    col = col + 1; % Add to color
+                    counter = counter + 1; % Add to counter
                 end
-                % Determine Axis boundaries 
-                y_lims(1,counter) = max(legend_lines(col).mainLine.YData);
-                y_lims(2,counter) = min(legend_lines(col).mainLine.YData);
                 
-                col = col + 1; % Add to color 
-                counter = counter + 1; % Add to counter 
+            end
+        end
+        axis([1/unit_conversion(1,p) crop/unit_conversion(1,p) ...
+            min(y_lims(2,:)) max(y_lims(1,:))]); % Set axis limits
+        try
+            set(gca,'XTick',...
+                [1/unit_conversion(1,p), 1/unit_conversion(1,p)*10,...
+                crop/unit_conversion(1,p)]); % set x tick labels
+        catch
+            set(gca,'XTick',...
+                [1/unit_conversion(1,p),(0.5*crop)/unit_conversion(1,p),...
+                crop/unit_conversion(1,p)]); % set x tick labels      
+        end
+        % Set decimal places depending on units
+        if unit_conversion(1,p) > 1
+            xtickformat('%.2f');
+        else
+            xtickformat('%.0f');
+        end
+        set(gca,'XScale','log'); % set log axis
+        xlabel(units(p),'Fontsize',12); % X labels
+        ylabel('Probability Density','Fontsize',12); % Y label
+        
+    else % For the other parameters
+        col = 1;
+        for g = 1:max(group_tags) % for each group
+            clear data;
+            % Day
+            data{1} = parameter_comparisons{p}(:,g,days_crop(days)); % extract data 
+            data{1}(isnan(data{1})) = []; % remove nan values 
+            data{1} = nanmean(reshape(data{1},[group_sizes(g),size(days_crop(days),2)]),2)/...
+                unit_conversion(1,p); % take a mean & convert units  
+            
+            % Night
+            data{2} = parameter_comparisons{p}(:,g,nights_crop(nights));
+            data{2}(isnan(data{2})) = [];
+            data{2} = nanmean(reshape(data{2},[group_sizes(g),size(nights_crop(nights),2)]),2)/...
+                unit_conversion(1,p);
+            
+            % Plot
+            for e = 1:max(experiment_tags)
+                spread_cols = plotSpread(data{1}(experiment_tags(group_tags == g) == e),...
+                    'xValues',g,'distributionColors',...
+                    cmap_2(col,:)+(1-cmap_2(col,:))*(1-(1/e^.5)),'showMM',2);
+                spread_cols{2}.LineWidth = 3; spread_cols{2}.Color = [1 0.5 0]; % Change marker properties
+                spread_cols = plotSpread(data{2}(experiment_tags(group_tags == g) == e),...
+                    'xValues',g,'distributionColors',...
+                    cmap_2(col+1,:)+(1-cmap_2(col+1,:))*(1-(1/e^.5)),'showMM',2);
+                spread_cols{2}.LineWidth = 3; spread_cols{2}.Color = [1 0.5 0]; % Change marker properties
             end
             
+            col = col + 2;
+            
         end
-       end 
-        axis([1/unit_conversion(1,p) crop/unit_conversion(1,p) ...
-            min(y_lims(2,:)) max(y_lims(1,:))]); % Set axis limits 
-        try
-        set(gca,'XTick',...
-            [1/unit_conversion(1,p), 1/unit_conversion(1,p)*10,...
-                crop/unit_conversion(1,p)]); % set x tick labels 
-        catch 
-        end 
-        % Set decimal places depending on units 
-        if unit_conversion(1,p) > 1 
-             xtickformat('%.2f');
-        else 
-            xtickformat('%.0f');
-        end 
-        set(gca,'XScale','log'); % set log axis 
-        xlabel(units(p),'Fontsize',12); % X labels 
-        ylabel('Probability Density','Fontsize',12); % Y label  
-    
-    else % For the other parameters 
-        for e = 1:max(experiment_tags)
-          spread_cols = plotSpread(squeeze(nanmean(permute(parameter_comparisons{p}(experiment_tags(group_tags == g) == e,:,days_crop(days)),[1 3 2]),2))/...
-                unit_conversion(1,p),...
-                'distributionColors',cmap_2(1:2:size(cmap_2,1),:)+(1-cmap_2(1:2:size(cmap_2,1),:))*(1-(1/e^.5)),'showMM',2); % Scatter day data  
-            spread_cols{2}.LineWidth = 3; spread_cols{2}.Color = [1 0.5 0]; % Change marker properties  
-            spread_cols = plotSpread(squeeze(nanmean(permute(parameter_comparisons{p}(experiment_tags(group_tags == g) == e,:,nights_crop(nights)),[1 3 2]),2))/...
-                unit_conversion(1,p),...
-                'distributionColors',cmap_2(2:2:size(cmap_2,1),:)+(1-cmap_2(2:2:size(cmap_2,1),:))*(1-(1/e^.5)),'showMM',2); % Scatter night data 
-            spread_cols{2}.LineWidth = 3; spread_cols{2}.Color = [1 0.5 0]; % Change marker properties
-        end 
-        ylabel(units(p),'Fontsize',12); % Y labels 
-        set(gca,'xticklabel',geno_list.colheaders,'Fontsize',12); % Name each group  
+        ylabel(units(p),'Fontsize',12); % Y labels
+        set(gca,'xtick',1:max(group_tags)); % Set x ticks 
+        set(gca,'xticklabel',geno_list.colheaders,'Fontsize',12); % Name each group
     end
-    if p == 5 % For the 5th parameter - add a legend 
+    if p == 5 % For the 5th parameter - add a legend
         [~,icons,~,~] = legend(legend_cols,legend_cell,'Location','best');
-        legend('boxoff'); 
-        set(icons(1:max(group_tags)*2),'Fontsize',13); 
-        set(icons((max(group_tags)*2)+1:2:end),'LineWidth',3); 
+        legend('boxoff');
+        set(icons(1:max(group_tags)*2),'Fontsize',13);
+        set(icons((max(group_tags)*2)+1:2:end),'LineWidth',3);
     end
-        
+    
 end
-
-clear col g p spread_cols t xl icons 
+ 
+clear col g p spread_cols t xl icons data
 
 %% Figure - Parameter Distributions V3 (With No Error Bars)
-    % Uses a log axis for plots 
-    % Plot's no Error Bar for ease of Visualization 
-    
-figure; 
+% Uses a log axis for plots
+% Plot's no Error Bar for ease of Visualization
+
+figure;
 for p = 1:size(parameters,2) - 2 % For each parameter
-    subplot(2,5,p); hold on; col = 1; counter = 1; 
+    subplot(2,5,p); hold on; col = 1; counter = 1;
     clear data legend_lines legend_cols legend_cell r sample crop y_lims spread_cols;
-    box off; set(gca, 'Layer','top'); set(gca,'Fontsize',12); set(gca,'FontName','Calibri'); % Set Font  
+    box off; set(gca, 'Layer','top'); set(gca,'Fontsize',12); set(gca,'FontName','Calibri'); % Set Font
     title(parameters{p}); % Add title
     
-    if ismember(p,[7:9 11:12]) == 0 % For most parameters 
+    if ismember(p,[7:9 11:12]) == 0 % For most parameters
         
-        % Take day & night distributions across time windows  
+        % Take day & night distributions across time windows
         data{1,1} = reshape(permute(parameter_dists{p}(:,:,days_crop(days)),[1 3 2]),...
             [],size(parameter_dists{p}(:,:,days_crop(days)),2));
         data{1,2} = reshape(permute(parameter_dists{p}(:,:,nights_crop(nights)),[1 3 2]),...
             [],size(parameter_dists{p}(:,:,nights_crop(nights)),2));
         
-        % Expand group tags to account for multiple days/nights 
+        % Expand group tags to account for multiple days/nights
         data{2,1} = repmat(group_tags,[size(data{1,1},1)/size(group_tags,1),1]);
         data{2,2} = repmat(group_tags,[size(data{1,2},1)/size(group_tags,1),1]);
         
-        % Expand experiment tags to account for multiple days/nights 
+        % Expand experiment tags to account for multiple days/nights
         data{3,1} = repmat(experiment_tags,[size(data{1,1},1)/size(experiment_tags,1),1]);
         data{3,2} = repmat(experiment_tags,[size(data{1,2},1)/size(experiment_tags,1),1]);
         
         % V2
-        % Find a cut off for each figure 
-            % This helps with visualisation & prevents the generation of 
-                % large patch objects which often crash Matlab 
-            %crop = find(nanmean([data{1,1} ; data{1,2}]) < 0.01,1,'first');
+        % Find a cut off for each figure
+        % This helps with visualisation & prevents the generation of
+        % large patch objects which often crash Matlab
+        %crop = find(nanmean([data{1,1} ; data{1,2}]) < 0.01,1,'first');
         
-       % V3 
-       crop = size(data{1,1},2); % crop = all data
-       
-       for e = 1:max(experiment_tags) % For each experimet 
-           col = 1;  
-        for g = 1:max(group_tags) % For each group
-            for t = 1:2 % For day/night
-                  % SEM 
-%                 if t == 1 % for day 
-%                     sample = size(find(data{2,t} == g & data{3,t} == e),1)/...
-%                         size(days,2);
-%                 else % for night
-%                     sample = size(find(data{2,t} == g & data{3,t} == e),1)/...
-%                         size(nights,2);
-%                 end
-%                     Find the number of fish
-                
-                legend_lines(col) = plot((1:crop)/unit_conversion(1,p),...
-                    nanmean(data{1,t}(data{2,t} == g & data{3,t} == e,1:crop)),...
-                    'color',cmap_2(col,:)+(1-cmap_2(col,:))*(1-(1/e^.5)),...
-                    'linewidth',3); 
-                % Plot - note that this is now in appropriate units
-                    % (eg.seconds) 
-                
-                legend_cols(col,:) = legend_lines(col).Color; % Save color
-
-                % Append time window to group names 
-                if e == 1 % For the first experiment 
-                    if first_night == 2 % If starting in the day
-                        if t == 1 % For the days
-                            legend_cell{col} = horzcat(geno_list.colheaders{g},' - Day'); % Tag
-                        else % For the nights
-                            legend_cell{col} = horzcat(geno_list.colheaders{g},' - Night'); % Tag
-                        end
-                    else % If starting in the night
-                        if t == 1 % For the nights
-                            legend_cell{col} = horzcat(geno_list.colheaders{g},' - Night'); % Tag
-                        else % For the days
-                            legend_cell{col} = horzcat(geno_list.colheaders{g},' - Day'); % Tag
+        % V3
+        crop = size(data{1,1},2); % crop = all data
+        
+        for e = 1:max(experiment_tags) % For each experimet
+            col = 1;
+            for g = 1:max(group_tags) % For each group
+                for t = 1:2 % For day/night
+                    % SEM
+                    %                 if t == 1 % for day
+                    %                     sample = size(find(data{2,t} == g & data{3,t} == e),1)/...
+                    %                         size(days,2);
+                    %                 else % for night
+                    %                     sample = size(find(data{2,t} == g & data{3,t} == e),1)/...
+                    %                         size(nights,2);
+                    %                 end
+                    %                     Find the number of fish
+                    
+                    legend_lines(col) = plot((1:crop)/unit_conversion(1,p),...
+                        nanmean(data{1,t}(data{2,t} == g & data{3,t} == e,1:crop)),...
+                        'color',cmap_2(col,:)+(1-cmap_2(col,:))*(1-(1/e^.5)),...
+                        'linewidth',3);
+                    % Plot - note that this is now in appropriate units
+                    % (eg.seconds)
+                    
+                    legend_cols(col,:) = legend_lines(col).Color; % Save color
+                    
+                    % Append time window to group names
+                    if e == 1 % For the first experiment
+                        if first_night == 2 % If starting in the day
+                            if t == 1 % For the days
+                                legend_cell{col} = horzcat(geno_list.colheaders{g},' - Day'); % Tag
+                            else % For the nights
+                                legend_cell{col} = horzcat(geno_list.colheaders{g},' - Night'); % Tag
+                            end
+                        else % If starting in the night
+                            if t == 1 % For the nights
+                                legend_cell{col} = horzcat(geno_list.colheaders{g},' - Night'); % Tag
+                            else % For the days
+                                legend_cell{col} = horzcat(geno_list.colheaders{g},' - Day'); % Tag
+                            end
                         end
                     end
+                    % Determine Axis boundaries
+                    y_lims(1,counter) = max(legend_lines(col).YData);
+                    y_lims(2,counter) = min(legend_lines(col).YData);
+                    
+                    col = col + 1; % Add to color
+                    counter = counter + 1; % Add to counter
                 end
-                % Determine Axis boundaries 
-                y_lims(1,counter) = max(legend_lines(col).YData);
-                y_lims(2,counter) = min(legend_lines(col).YData);
                 
-                col = col + 1; % Add to color 
-                counter = counter + 1; % Add to counter 
+            end
+        end
+        axis([1/unit_conversion(1,p) crop/unit_conversion(1,p) ...
+            min(y_lims(2,:)) max(y_lims(1,:))]); % Set axis limits
+        try
+            set(gca,'XTick',...
+                [1/unit_conversion(1,p), 1/unit_conversion(1,p)*10,...
+                crop/unit_conversion(1,p)]); % set x tick labels
+        catch
+            set(gca,'XTick',...
+                [1/unit_conversion(1,p),(0.5*crop)/unit_conversion(1,p),...
+                crop/unit_conversion(1,p)]); % set x tick labels
+        end
+        % Set decimal places depending on units
+        if unit_conversion(1,p) > 1
+            xtickformat('%.2f');
+        else
+            xtickformat('%.0f');
+        end
+        set(gca,'XScale','log'); % set log axis
+        xlabel(units(p),'Fontsize',12); % X labels
+        ylabel('Probability Density','Fontsize',12); % Y label
+        
+    else % For the other parameters
+        col = 1;
+        for g = 1:max(group_tags) % for each group
+            clear data;
+            % Day
+            data{1} = parameter_comparisons{p}(:,g,days_crop(days)); % extract data 
+            data{1}(isnan(data{1})) = []; % remove nan values
+            data{1} = nanmean(reshape(data{1},[group_sizes(g),size(days_crop(days),2)]),2)/...
+                unit_conversion(1,p); % take mean and conv
+            
+            % Night
+            data{2} = parameter_comparisons{p}(:,g,nights_crop(nights));
+            data{2}(isnan(data{2})) = [];
+            data{2} = nanmean(reshape(data{2},[group_sizes(g),size(nights_crop(nights),2)]),2)/...
+                unit_conversion(1,p);
+            
+            % Plot
+            for e = 1:max(experiment_tags)
+                spread_cols = plotSpread(data{1}(experiment_tags(group_tags == g) == e),...
+                    'xValues',g,'distributionColors',...
+                    cmap_2(col,:)+(1-cmap_2(col,:))*(1-(1/e^.5)),'showMM',2);
+                spread_cols{2}.LineWidth = 3; spread_cols{2}.Color = [1 0.5 0]; % Change marker properties
+                spread_cols = plotSpread(data{2}(experiment_tags(group_tags == g) == e),...
+                    'xValues',g,'distributionColors',...
+                    cmap_2(col+1,:)+(1-cmap_2(col+1,:))*(1-(1/e^.5)),'showMM',2);
+                spread_cols{2}.LineWidth = 3; spread_cols{2}.Color = [1 0.5 0]; % Change marker properties
             end
             
+            col = col + 2;
+            
         end
-       end 
-        axis([1/unit_conversion(1,p) crop/unit_conversion(1,p) ...
-            min(y_lims(2,:)) max(y_lims(1,:))]); % Set axis limits 
-        try
-        set(gca,'XTick',...
-            [1/unit_conversion(1,p), 1/unit_conversion(1,p)*10,...
-                crop/unit_conversion(1,p)]); % set x tick labels 
-        catch 
-        end 
-        % Set decimal places depending on units 
-        if unit_conversion(1,p) > 1 
-             xtickformat('%.2f');
-        else 
-            xtickformat('%.0f');
-        end 
-        set(gca,'XScale','log'); % set log axis 
-        xlabel(units(p),'Fontsize',12); % X labels 
-        ylabel('Probability Density','Fontsize',12); % Y label  
-    
-    else % For the other parameters 
-        for e = 1:max(experiment_tags)
-          spread_cols = plotSpread(squeeze(nanmean(permute(parameter_comparisons{p}(experiment_tags(group_tags == g) == e,:,days_crop(days)),[1 3 2]),2))/...
-                unit_conversion(1,p),...
-                'distributionColors',cmap_2(1:2:size(cmap_2,1),:)+(1-cmap_2(1:2:size(cmap_2,1),:))*(1-(1/e^.5)),'showMM',2); % Scatter day data  
-            spread_cols{2}.LineWidth = 3; spread_cols{2}.Color = [1 0.5 0]; % Change marker properties  
-            spread_cols = plotSpread(squeeze(nanmean(permute(parameter_comparisons{p}(experiment_tags(group_tags == g) == e,:,nights_crop(nights)),[1 3 2]),2))/...
-                unit_conversion(1,p),...
-                'distributionColors',cmap_2(2:2:size(cmap_2,1),:)+(1-cmap_2(2:2:size(cmap_2,1),:))*(1-(1/e^.5)),'showMM',2); % Scatter night data 
-            spread_cols{2}.LineWidth = 3; spread_cols{2}.Color = [1 0.5 0]; % Change marker properties
-        end 
-        ylabel(units(p),'Fontsize',12); % Y labels 
-        xticks([]); 
-        %set(gca,'xticklabel',geno_list.colheaders,'Fontsize',12); % Name each group  
+        ylabel(units(p),'Fontsize',12); % Y labels
+        set(gca,'xtick',1:max(group_tags)); % Set x ticks
+        set(gca,'xticklabel',geno_list.colheaders,'Fontsize',12); % Name each group
     end
     
     if p == 5 % For the 5th parameter - add a legend
         [~,icons,~,~] = legend(legend_lines,legend_cell,'Location','best');
-        legend('boxoff'); 
-        set(icons(1:max(group_tags)*2),'Fontsize',13); 
-        set(icons((max(group_tags)*2)+1:2:end),'LineWidth',3); 
+        legend('boxoff');
+        set(icons(1:max(group_tags)*2),'Fontsize',13);
+        set(icons((max(group_tags)*2)+1:2:end),'LineWidth',3);
     end
-        
+    
 end
 
-clear col g p spread_cols t xl icons 
+clear col g p spread_cols t xl icons data counter crop legend_cell legend_cols...
+    legend_lines y_lims 
 
 %% Stats - Two Way ANOVA 
     % Note that when fish don't have bouts in a time window, they retain
@@ -1643,7 +1698,7 @@ clear anova_development anova_group anova_time anova_experiment p scrap t
 %% Stats - KW 
 
 for p = 1:size(parameters,2)-2 % For each parameter
-    clear data; c = 1; d = 1; % Start counters 
+    clear data data_2; c = 1; d = 1; % Start counters 
     if ismember(p,[7:9 11:12]) == 0 % For most parameters 
         data{1,1} = reshape(permute(parameter_dists{p}(:,:,days_crop(days)),[1 3 2]),...
             [],size(parameter_dists{p}(:,:,days_crop(days)),2)); % Day data
@@ -1677,15 +1732,20 @@ for p = 1:size(parameters,2)-2 % For each parameter
         data{1,1} = squeeze(nanmean(permute(parameter_comparisons{p}(:,:,days_crop(days)),[1 3 2]),2)); % Day data
         data{1,2} = squeeze(nanmean(permute(parameter_comparisons{p}(:,:,nights_crop(nights)),[1 3 2]),2)); % Night data
              
+        for g = 1:max(group_tags) % for each group 
+            data_2{1,g} = data{1,1}(:,g); data_2{1,g}(isnan(data_2{1,g})) = []; 
+            data_2{2,g} = data{1,2}(:,g); data_2{2,g}(isnan(data_2{2,g})) = []; 
+        end 
+        
         for e = 1:max(experiment_tags) % For each experiment
             for g = 1:max(group_tags) % For each group
-                [kw.time_h(d,p),kw.time_p(d,p)] = kstest2(data{1,1}(experiment_tags(group_tags == g) == e,g),...
-                    data{1,2}(experiment_tags(group_tags == g) == e,g)); % Compare day vs night
+                [kw.time_h(d,p),kw.time_p(d,p)] = kstest2(data_2{1,g}(experiment_tags(group_tags == g) == e,1),...
+                    data_2{2,g}(experiment_tags(group_tags == g) == e,1)); % Compare day vs night
                 d = d + 1; % add to counter
                 for n = g+1:max(group_tags) % for each group comparison
                     for t = 1:2 % For each time window
-                        [kw.group_h{p}(c,t),kw.group_p{p}(c,t)] = kstest2(data{1,t}(experiment_tags(group_tags == g) == e,g),...
-                            data{1,t}(experiment_tags(group_tags == g) == e,n)); % Make each comparison
+                        [kw.group_h{p}(c,t),kw.group_p{p}(c,t)] = kstest2(data_2{t,g}(experiment_tags(group_tags == g) == e,1),...
+                            data_2{t,n}(experiment_tags(group_tags == n) == e,1)); % Make each comparison
                     end
                     c = c + 1; % add to counter
                 end
@@ -1693,3 +1753,5 @@ for p = 1:size(parameters,2)-2 % For each parameter
         end
     end
 end
+
+clear p data data_2 c d e g n t 

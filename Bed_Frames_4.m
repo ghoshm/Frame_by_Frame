@@ -1029,12 +1029,15 @@ if max(group_tags) == 1
     cmap_2(1,:) = cmap;
     cmap_2(2,:) = [25 25 112]/255; % midnight blue
 else 
-    cmap = flip(cmap); 
-    cmap_2 = flip(cmap_2); 
+    cmap_2 = flip(cmap_2); % flip cmap 
+    for c = 1:2:size(cmap_2,1) 
+        cmap_2([c c+1],:) = cmap_2([c+1 c],:); % swap the colors around
+    end 
+    cmap = cmap_2(1:2:size(cmap_2,1),:); % Extract main colors 
 end
 
 % Selecting a time window 
-days = [1 2 3 4]; nights = [1 2 3]; % Hard Coded 
+days = [2 3]; nights = [2 3]; % Hard Coded 
 time_window(1) = min([days_crop(days) nights_crop(nights)]);  
 time_window(2) = max([days_crop(days) nights_crop(nights)]); 
 

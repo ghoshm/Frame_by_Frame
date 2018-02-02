@@ -35,6 +35,9 @@ lines_per_sheet = 50000; % Specify the number of data points per Excel Sheet
     %https://uk.mathworks.com/matlabcentral/fileexchange/17555-light-bartlein-color-maps
 
 %% Load Data from Excel Sheets 
+
+set(0,'DefaultFigureWindowStyle','docked'); % dock figures 
+
 tic
 folder_path = uigetdir; % Choose your experiment
 folder_open = dir2(folder_path); % Open this folder

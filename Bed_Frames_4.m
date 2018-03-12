@@ -37,6 +37,7 @@ lines_per_sheet = 50000; % Specify the number of data points per Excel Sheet
 %% Load Data from Excel Sheets 
 
 set(0,'DefaultFigureWindowStyle','docked'); % dock figures 
+set(0,'defaultfigurecolor',[1 1 1]); % white background
 
 tic
 folder_path = uigetdir; % Choose your experiment

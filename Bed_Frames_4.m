@@ -1,4 +1,4 @@
-% Bed_Frames_4 
+%% Bed_Frames_4 
 
 % V2 - aims to correct errors as it loads each Excel sheet 
     % This is far easier than trying to handle the errors once the data is 
@@ -34,10 +34,11 @@ lines_per_sheet = 50000; % Specify the number of data points per Excel Sheet
 % Lbmap
     %https://uk.mathworks.com/matlabcentral/fileexchange/17555-light-bartlein-color-maps
 
-%% Load Data from Excel Sheets 
-
+%% Settings 
 set(0,'DefaultFigureWindowStyle','docked'); % dock figures 
 set(0,'defaultfigurecolor',[1 1 1]); % white background
+
+%% Load Data from Excel Sheets 
 
 tic
 folder_path = uigetdir; % Choose your experiment

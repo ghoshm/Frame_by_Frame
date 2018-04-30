@@ -834,7 +834,7 @@ for f = 1:size(delta_px_sq,2) % For each fish
     a = 1; % Start a counter
     for t = 1:(fps):size(delta_px_sq,1) % For each second
         if t + (fps-1) < size(delta_px_sq,1) % Check to prevent running off the end
-            delta_px_sq_sec(a,f) = nanmean(delta_px_sq(t:t+(fps-1),f)); % Bin activity
+            delta_px_sq_sec(a,f) = nansum(delta_px_sq(t:t+(fps-1),f)); % Bin activity
             
             for p = 1:size(parameters,2) % For each parameter
                 if parameter_smooth(p) == 0 % For most parameters
